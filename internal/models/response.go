@@ -21,7 +21,7 @@ type CartResponse struct {
 }
 
 type StudentCart struct {
-	StudentID  string     `json:"student_id"`
+	StudentID  string     `json:"_id"`
 	Items      []CartItem `json:"items"`
 	TotalPrice float64    `json:"total_price"`
 }

@@ -39,6 +39,14 @@ func (r *orderRepository) GetOrders(ctx context.Context, req models.SearchOrderR
 		filter["status"] = req.Status
 	}
 
+	if req.OrderId != "" {
+		orderID, err := primitive.ObjectIDFromHex(req.OrderId)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid order ID")
+		}
+		filter["_id"] = orderID
+	}
+
 	totalItems, err := r.collection.CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, 0, err

@@ -8,8 +8,9 @@ import (
 	"store/internal/models"
 	"store/internal/repository"
 	"store/pkg/consul"
-	"time"
 	"store/pkg/email"
+	"time"
+
 	"github.com/hashicorp/consul/api"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -24,8 +25,8 @@ type OrderService interface {
 }
 
 type orderService struct {
-	orderRepo repository.OrderRepository
-	cartAPI   *callAPI
+	orderRepo    repository.OrderRepository
+	cartAPI      *callAPI
 	emailService *email.EmailService
 }
 
@@ -42,8 +43,8 @@ func NewOrderService(orderRepo repository.OrderRepository, client *api.Client) O
 	cartAPI := NewServiceAPI(client, getCartUser)
 	emailService := email.NewEmailService()
 	return &orderService{
-		orderRepo: orderRepo,
-		cartAPI:   cartAPI,
+		orderRepo:    orderRepo,
+		cartAPI:      cartAPI,
 		emailService: emailService,
 	}
 }
@@ -74,7 +75,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherReque
 	if cartData == nil {
 		return nil, fmt.Errorf("failed to get cart data")
 	}
-	
+
 	checkCartStudent := false
 	for _, studentCart := range cartData.([]models.StudentCart) {
 		if len(studentCart.Items) == 0 {
@@ -84,45 +85,45 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherReque
 			break
 		}
 	}
-	
+
 	if !checkCartStudent {
 		return nil, fmt.Errorf("cart is empty")
 	}
-	
+
 	fmt.Printf("Cart data retrieved: %v\n", cartData.([]models.StudentCart))
 
 	var orderItems []models.OrderItem
 	var total float64
 
-	for _, studentCart := range cartData.([]models.StudentCart) { 
-		for _, cartItem := range studentCart.Items { 
-				productID, err := primitive.ObjectIDFromHex(cartItem.ProductID)
-				if err != nil {
-					fmt.Printf("Invalid product ID for student %s: %v\n", studentCart.StudentID, err)
-					continue
-				}
-	
-				totalPrice := float64(cartItem.Quantity) * cartItem.Price
-				total += totalPrice
-	
-				orderItems = append(orderItems, models.OrderItem{
-					ProductID:  productID,
-					Quantity:   cartItem.Quantity,
-					Price:      cartItem.Price,
-					Name:       cartItem.ProductName,
-					TotalPrice: totalPrice,
-					StudentID:  studentCart.StudentID, 
-				})
+	for _, studentCart := range cartData.([]models.StudentCart) {
+		for _, cartItem := range studentCart.Items {
+			productID, err := primitive.ObjectIDFromHex(cartItem.ProductID)
+			if err != nil {
+				fmt.Printf("Invalid product ID for student %s: %v\n", studentCart.StudentID, err)
+				continue
+			}
+
+			totalPrice := float64(cartItem.Quantity) * cartItem.Price
+			total += totalPrice
+
+			orderItems = append(orderItems, models.OrderItem{
+				ProductID:  productID,
+				Quantity:   cartItem.Quantity,
+				Price:      cartItem.Price,
+				Name:       cartItem.ProductName,
+				TotalPrice: totalPrice,
+				StudentID:  studentCart.StudentID,
+			})
 		}
 	}
 
 	order := models.Order{
-		TeacherID:     req.TeacherID,
-		Email:         req.Email,	
+		TeacherID:  req.TeacherID,
+		Email:      req.Email,
 		TotalPrice: total,
 		Status:     "pending",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
 		Items:      orderItems,
 		ShippingAddress: models.Address{
 			Type:       "home",
@@ -185,7 +186,6 @@ func (s *orderService) UpdateOrder(ctx context.Context, id string, orderRequest 
 
 	return s.orderRepo.UpdateOrder(ctx, objectID, orderRequest)
 }
-
 
 func (s *orderService) DeleteOrder(ctx context.Context, id string) error {
 
