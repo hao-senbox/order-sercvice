@@ -4,18 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/hashicorp/consul/api"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"net/http"
 	"store/internal/models"
 	"store/internal/repository"
 	"store/pkg/consul"
-	"store/pkg/email"
 	"time"
+	"store/pkg/email"
+	"github.com/hashicorp/consul/api"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type OrderService interface {
-	GetGroupedOrders(ctx context.Context, orders []*models.Order) ([]*models.GroupedOrder, error)
+	GetGroupedOrders(ctx context.Context,  orders []*models.Order) ([]*models.GroupedOrder, error)
 	GetOrderDetail(ctx context.Context, id string) (*models.GroupedOrder, error)
 	GetOrdersUser(ctx context.Context, userID string) ([]*models.GroupedOrder, error)
 	CreateOrder(ctx context.Context, req *models.TeacherIdRequest) (*models.Order, error)
@@ -24,8 +24,8 @@ type OrderService interface {
 }
 
 type orderService struct {
-	orderRepo    repository.OrderRepository
-	cartAPI      *callAPI
+	orderRepo repository.OrderRepository
+	cartAPI   *callAPI
 	emailService *email.EmailService
 }
 
@@ -42,8 +42,8 @@ func NewOrderService(orderRepo repository.OrderRepository, client *api.Client) O
 	cartAPI := NewServiceAPI(client, getCartUser)
 	emailService := email.NewEmailService()
 	return &orderService{
-		orderRepo:    orderRepo,
-		cartAPI:      cartAPI,
+		orderRepo: orderRepo,
+		cartAPI:   cartAPI,
 		emailService: emailService,
 	}
 }
@@ -74,52 +74,52 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherIdReq
 	if cartData == nil {
 		return nil, fmt.Errorf("failed to get cart data")
 	}
-
+	
 	checkCartStudent := false
 	for _, studentCart := range cartData.([]models.StudentCart) {
 		if len(studentCart.Items) == 0 {
 			continue
-		} else {
+		} else if len(studentCart.Items) > 0 {
 			checkCartStudent = true
 			break
 		}
 	}
-
+	
 	if !checkCartStudent {
 		return nil, fmt.Errorf("cart is empty")
 	}
-
+	
 	fmt.Printf("Cart data retrieved: %v\n", cartData.([]models.StudentCart))
 
 	var orderItems []models.OrderItems
 	var total float64
 
-	for _, studentCart := range cartData.([]models.StudentCart) {
-		for _, cartItem := range studentCart.Items {
-			productID, err := primitive.ObjectIDFromHex(cartItem.ProductID)
-			if err != nil {
-				fmt.Printf("Invalid product ID for student %s: %v\n", studentCart.StudentID, err)
-				continue
-			}
-
-			totalPrice := float64(cartItem.Quantity) * cartItem.Price
-			total += totalPrice
-
-			orderItems = append(orderItems, models.OrderItems{
-				ProductID:  productID,
-				Quantity:   cartItem.Quantity,
-				Price:      cartItem.Price,
-				Name:       cartItem.ProductName,
-				TotalPrice: totalPrice,
-				StudentID:  studentCart.StudentID,
-			})
+	for _, studentCart := range cartData.([]models.StudentCart) { 
+		for _, cartItem := range studentCart.Items { 
+				productID, err := primitive.ObjectIDFromHex(cartItem.ProductID)
+				if err != nil {
+					fmt.Printf("Invalid product ID for student %s: %v\n", studentCart.StudentID, err)
+					continue
+				}
+	
+				totalPrice := float64(cartItem.Quantity) * cartItem.Price
+				total += totalPrice
+	
+				orderItems = append(orderItems, models.OrderItems{
+					ProductID:  productID,
+					Quantity:   cartItem.Quantity,
+					Price:      cartItem.Price,
+					Name:       cartItem.ProductName,
+					TotalPrice: totalPrice,
+					StudentID:  studentCart.StudentID, 
+				})
 		}
 	}
 
 	order := models.Order{
-		TeacherID:  req.TeacherID,
+		TeacherID:     req.TeacherID,
+		Email:         req.Email,	
 		TotalPrice: total,
-		Email:      req.Email,
 		Status:     "awaiting_confirmation",
 		CreateAt:   time.Now(),
 		UpdateAt:   time.Now(),
@@ -175,7 +175,7 @@ func (s *orderService) UpdateOrder(ctx context.Context, id string, orderRequest 
 		if err := s.emailService.SendOrderConfirmationUpdate(order.Email, order); err != nil {
 			fmt.Printf("failed to send confirmation email: %v\n", err)
 		} else {
-			fmt.Printf("order confirmation email sent to: %s\n", "hao01638081724@gmail.com")
+			fmt.Printf("order confirmation email sent to: %s\n", order.Email)
 		}
 	}
 
@@ -185,6 +185,7 @@ func (s *orderService) UpdateOrder(ctx context.Context, id string, orderRequest 
 
 	return s.orderRepo.UpdateOrder(ctx, objectID, orderRequest)
 }
+
 
 func (s *orderService) DeleteOrder(ctx context.Context, id string) error {
 
@@ -218,7 +219,7 @@ func NewServiceAPI(client *api.Client, serviceName string) *callAPI {
 }
 
 func (c *callAPI) GetCartByUserID(UserID string) interface{} {
-	endpoint := fmt.Sprintf("/api/cart/items/%s", UserID)
+	endpoint := fmt.Sprintf("/api/v1/cart/items/%s", UserID)
 	fmt.Printf("Calling cart service with endpoint: %s\n", endpoint)
 
 	res, err := c.client.CallAPI(c.clientServer, endpoint, http.MethodGet, nil, nil)
@@ -239,7 +240,6 @@ func (c *callAPI) GetCartByUserID(UserID string) interface{} {
 		fmt.Printf("Error unmarshaling cart data: %v\n", err)
 		return nil
 	}
-
 	// Return the actual cart data from inside the wrapper
 	return responseWrapper.Data
 }
