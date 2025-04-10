@@ -15,10 +15,10 @@ import (
 )
 
 type OrderService interface {
-	GetGroupedOrders(ctx context.Context,  orders []*models.Order) ([]*models.GroupedOrder, error)
+	GetGroupedOrders(ctx context.Context, req models.SearchOrderRequest) ([]*models.GroupedOrder, int64, error)
 	GetOrderDetail(ctx context.Context, id string) (*models.GroupedOrder, error)
 	GetOrdersUser(ctx context.Context, userID string) ([]*models.GroupedOrder, error)
-	CreateOrder(ctx context.Context, req *models.TeacherIdRequest) (*models.Order, error)
+	CreateOrder(ctx context.Context, req *models.TeacherRequest) (*models.Order, error)
 	UpdateOrder(ctx context.Context, id string, orderRequest models.UpdateStatusRequest) error
 	DeleteOrder(ctx context.Context, id string) error
 }
@@ -48,8 +48,8 @@ func NewOrderService(orderRepo repository.OrderRepository, client *api.Client) O
 	}
 }
 
-func (s *orderService) GetGroupedOrders(ctx context.Context, orders []*models.Order) ([]*models.GroupedOrder, error) {
-	return s.orderRepo.GetOrders(ctx)
+func (s *orderService) GetGroupedOrders(ctx context.Context, req models.SearchOrderRequest) ([]*models.GroupedOrder, int64, error) {
+	return s.orderRepo.GetOrders(ctx, req)
 }
 
 func (s *orderService) GetOrderDetail(ctx context.Context, id string) (*models.GroupedOrder, error) {
@@ -67,7 +67,7 @@ func (s *orderService) GetOrdersUser(ctx context.Context, TeacherID string) ([]*
 	return s.orderRepo.GetOrdersUser(ctx, TeacherID)
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherIdRequest) (*models.Order, error) {
+func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherRequest) (*models.Order, error) {
 	fmt.Printf("Creating order for user: %s\n", req.TeacherID)
 
 	cartData := s.cartAPI.GetCartByUserID(req.TeacherID)
@@ -91,7 +91,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherIdReq
 	
 	fmt.Printf("Cart data retrieved: %v\n", cartData.([]models.StudentCart))
 
-	var orderItems []models.OrderItems
+	var orderItems []models.OrderItem
 	var total float64
 
 	for _, studentCart := range cartData.([]models.StudentCart) { 
@@ -105,7 +105,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherIdReq
 				totalPrice := float64(cartItem.Quantity) * cartItem.Price
 				total += totalPrice
 	
-				orderItems = append(orderItems, models.OrderItems{
+				orderItems = append(orderItems, models.OrderItem{
 					ProductID:  productID,
 					Quantity:   cartItem.Quantity,
 					Price:      cartItem.Price,
@@ -120,9 +120,9 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherIdReq
 		TeacherID:     req.TeacherID,
 		Email:         req.Email,	
 		TotalPrice: total,
-		Status:     "awaiting_confirmation",
-		CreateAt:   time.Now(),
-		UpdateAt:   time.Now(),
+		Status:     "pending",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 		Items:      orderItems,
 		ShippingAddress: models.Address{
 			Type:       "home",
@@ -140,22 +140,22 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherIdReq
 	if err != nil {
 		return nil, fmt.Errorf("unable to create order: %w", err)
 	}
-	orders := []*models.Order{savedOrder}
-	groupedOrder, err := s.orderRepo.GetGroupedOrders(ctx, orders)
+	// orders := []*models.Order{savedOrder}
+	// groupedOrder, err := s.orderRepo.GetGroupedOrders(ctx, orders)
 
-	if err != nil {
-		return nil, fmt.Errorf("unable to create order: %w", err)
-	}
+	// if err != nil {
+	// 	return nil, fmt.Errorf("unable to create order: %w", err)
+	// }
 
-	if req.Email == "" {
-		fmt.Println("Warning: No email address provided for order confirmation")
-	} else {
-		if err := s.emailService.SendOrderConfirmation(req.Email, groupedOrder[0]); err != nil {
-			fmt.Printf("failed to send confirmation email: %v\n", err)
-		} else {
-			fmt.Printf("order confirmation email sent to: %s\n", req.Email)
-		}
-	}
+	// if req.Email == "" {
+	// 	fmt.Println("Warning: No email address provided for order confirmation")
+	// } else {
+	// 	if err := s.emailService.SendOrderConfirmation(req.Email, groupedOrder[0]); err != nil {
+	// 		fmt.Printf("failed to send confirmation email: %v\n", err)
+	// 	} else {
+	// 		fmt.Printf("order confirmation email sent to: %s\n", req.Email)
+	// 	}
+	// }
 
 	return savedOrder, nil
 }
@@ -164,19 +164,19 @@ func (s *orderService) UpdateOrder(ctx context.Context, id string, orderRequest 
 
 	objectID, err := primitive.ObjectIDFromHex(id)
 
-	if orderRequest.Status == "confirmed" {
+	if orderRequest.Status == "processing" {
 		order, err := s.orderRepo.GetOrderDetail(ctx, objectID)
 		if err != nil {
 			return fmt.Errorf("order not found")
 		}
-		if order.Status != "awaiting_confirmation" {
-			return fmt.Errorf("order status is not awaiting confirmation")
+		if order.Status != "pending" {
+			return fmt.Errorf("order status is not pending")
 		}
-		if err := s.emailService.SendOrderConfirmationUpdate(order.Email, order); err != nil {
-			fmt.Printf("failed to send confirmation email: %v\n", err)
-		} else {
-			fmt.Printf("order confirmation email sent to: %s\n", order.Email)
-		}
+		// if err := s.emailService.SendOrderConfirmationUpdate(order.Email, order); err != nil {
+		// 	fmt.Printf("failed to send confirmation email: %v\n", err)
+		// } else {
+		// 	fmt.Printf("order confirmation email sent to: %s\n", order.Email)
+		// }
 	}
 
 	if err != nil {

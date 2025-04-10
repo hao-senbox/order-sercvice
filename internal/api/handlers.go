@@ -2,9 +2,11 @@ package api
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"store/internal/models"
 	"store/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -39,7 +41,7 @@ func RegisterHandlers(router *gin.Engine, orderService service.OrderService) {
 
 func (h *OrderHandlers) CreateOrder(c *gin.Context) {
 	
-	var req models.TeacherIdRequest
+	var req models.TeacherRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		SendError(c, http.StatusBadRequest, err, models.ErrInvalidRequest)
@@ -69,15 +71,39 @@ func (h *OrderHandlers) CreateOrder(c *gin.Context) {
 
 func (h *OrderHandlers) GetOrders(c *gin.Context) {
 
-	var orders []*models.Order
-	ordersAll, err := h.orderService.GetGroupedOrders(c.Request.Context(), orders)
+	var req models.SearchOrderRequest
+
+	if err := c.ShouldBindQuery(&req); err != nil {
+		SendError(c, http.StatusBadRequest, err, models.ErrInvalidRequest)
+		return
+	}
+
+	if req.Page == 0 {
+		req.Page = 1
+	}
+
+	if req.Limit == 0 {
+		req.Limit = 10
+	}
+
+	results, totalItems, err := h.orderService.GetGroupedOrders(c.Request.Context(), req)
 
 	if err != nil {
 		SendError(c, http.StatusBadRequest, err, models.ErrInvalidRequest)
 		return
 	}
 
-	SendSuccess(c, http.StatusOK, "Order data retrieved successfully", ordersAll)
+	totalPages := int(math.Ceil(float64(totalItems) / float64(req.Limit)))
+
+	response := models.PaginatedResponse{
+		Page:       req.Page,
+		Limit:      req.Limit,
+		TotalPages: totalPages,
+		TotalItems: totalItems,
+		Data:       results,
+	}
+
+	SendSuccess(c, http.StatusOK, "Order data retrieved successfully", response)
 
 }
 

@@ -8,10 +8,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type OrderRepository interface {
-	GetOrders(ctx context.Context) ([]*models.GroupedOrder, error)
+	GetOrders(ctx context.Context, req models.SearchOrderRequest) ([]*models.GroupedOrder, int64, error)
 	GetOrderDetail(ctx context.Context, id primitive.ObjectID) (*models.GroupedOrder, error)
 	GetOrdersUser(ctx context.Context, TeacherID string) ([]*models.GroupedOrder, error)
 	CreateOrder(ctx context.Context, order models.Order) (*models.Order, error)
@@ -30,27 +31,42 @@ func NewOrderRepository(collection *mongo.Collection) OrderRepository {
 	}
 }
 
-func (r *orderRepository) GetOrders(ctx context.Context) ([]*models.GroupedOrder, error) {
+func (r *orderRepository) GetOrders(ctx context.Context, req models.SearchOrderRequest) ([]*models.GroupedOrder, int64, error) {
+	
+	filter := bson.M{}
 
-	var orders []*models.Order
-
-	cursor, err := r.collection.Find(ctx, bson.M{})
-
-	if err != nil {
-		return nil, err
+	if req.Status != "" {
+		filter["status"] = req.Status
 	}
 
+	totalItems, err := r.collection.CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	
+	skip := (req.Page - 1) * req.Limit
+	opts := options.Find().
+		SetSkip(int64(skip)).
+		SetLimit(int64(req.Limit)).
+		SetSort(bson.D{{Key: "create_at",Value:  -1}})
+		
+	cursor, err := r.collection.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
 	defer cursor.Close(ctx)
 
+	var orders []*models.Order
 	if err := cursor.All(ctx, &orders); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	ordersAll, err := r.GetGroupedOrders(ctx, orders)
+	groupedOrders, err := r.GetGroupedOrders(ctx, orders)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return ordersAll, nil
+
+	return groupedOrders, totalItems, nil
 
 }
 
@@ -61,7 +77,7 @@ func (r *orderRepository) GetGroupedOrders(ctx context.Context, orders []*models
 	// For each order, group the items by student_id
 	for _, order := range orders {
 		// Create a map to hold items grouped by student_id
-		studentItems := make(map[string][]models.OrderItems)
+		studentItems := make(map[string][]models.OrderItem)
 
 		// Group items by student_id
 		for i := range order.Items {
@@ -112,8 +128,8 @@ func (r *orderRepository) GetGroupedOrders(ctx context.Context, orders []*models
 			Status:          order.Status,
 			StudentOrders:   studentOrders,
 			ShippingAddress: order.ShippingAddress,
-			CreateAt:        order.CreateAt,
-			UpdateAt:        order.UpdateAt,
+			CreatedAt:        order.CreatedAt,
+			UpdatedAt:        order.UpdatedAt,
 		}
 
 		groupedOrders = append(groupedOrders, groupedOrder)

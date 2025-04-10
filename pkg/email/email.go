@@ -120,7 +120,7 @@ func (es *EmailService) SendOrderConfirmation(email string, order *models.Groupe
 					Your order has been received and is now being processed. Your order details are shown below for your reference:
 				</div>
 				<div class="order-info">
-					Order #` + order.ID.Hex() + ` (` + order.CreateAt.Format("January 2, 2006") + `)
+					Order #` + order.ID.Hex() + ` (` + order.CreatedAt.Format("January 2, 2006") + `)
 				</div>
 				<table>
 					<tr>
@@ -287,21 +287,21 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 		</head>
 		<body>
 			<div class="header">
-				Đơn hàng đã được xác nhận
+				Order confirmed
 			</div>
 			<div class="container">
 				<div class="confirmation-message">
-					Đơn hàng của bạn đã được xác nhận và đang được chuẩn bị!
+					Your order has been confirmed and is being prepared!
 				</div>
 				<div class="order-info">
-					<span class="order-number">Đơn hàng #` + order.ID.Hex() + `</span>
-					<p>Cảm ơn bạn đã đặt hàng. Đơn hàng của bạn đã được xác nhận và đang được xử lý.</p>
+					<span class="order-number">Order #` + order.ID.Hex() + `</span>
+					<p>Thank you for placing your order. Your order has been confirmed and is being processed.</p>
 				</div>
 				<table>
 					<tr>
-						<th>Sản phẩm</th>
-						<th>Số lượng</th>
-						<th>Giá</th>
+						<th>Product</th>
+						<th>Quantity</th>
+						<th>Price</th>
 					</tr>`
 
 	var subtotal float64
@@ -321,22 +321,22 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 	body += fmt.Sprintf(`
 				</table>
 				<div class="total">
-					Tổng cộng: $%.2f
+					Total: $%.2f
 				</div>
 				<div class="shipping-info">
-					<h3>Thông tin giao hàng</h3>
+					<h3>Delivery information</h3>
 					<p>
 						%s<br>
 						%s, %s<br>
 						%s %s<br>
-						Điện thoại: %s
+						Phone: %s
 					</p>
 				</div>
 				<div class="next-steps">
-					<h3>Các bước tiếp theo</h3>
-					<p>1. Đơn hàng của bạn đang được chuẩn bị</p>
-					<p>2. Bạn sẽ nhận được email khi đơn hàng được giao cho đơn vị vận chuyển</p>
-					<p>3. Theo dõi đơn hàng của bạn thông qua tài khoản của bạn</p>
+					<h3>Next steps</h3>
+					<p>1. Your order is being prepared</p>
+					<p>2. You will receive an email when your order is delivered to the shipping carrier.</p>
+					<p>3. Track your order through your account</p>
 				</div>
 			</div>
 		</body>

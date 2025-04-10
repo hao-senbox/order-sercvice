@@ -10,15 +10,15 @@ type Order struct {
 	ID              primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	TeacherID       string             `bson:"teacher_id" json:"teacher_id"`
 	Email           string             `bson:"email" json:"email"`
-	TotalPrice      float64            `bson:"total_amount" json:"total_amount"`
+	TotalPrice      float64            `bson:"total_price" json:"total_price"`
 	Status          string             `bson:"status" json:"status"`
-	Items           []OrderItems       `bson:"items" json:"items"`
+	Items           []OrderItem        `bson:"items" json:"items"`
 	ShippingAddress Address            `bson:"shipping_address" json:"shipping_address"`
-	CreateAt        time.Time          `bson:"create_at" json:"create_at"`
-	UpdateAt        time.Time          `bson:"update_at" json:"update_at"`
+	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
-type OrderItems struct {
+type OrderItem struct {
 	ProductID  primitive.ObjectID `bson:"product_id" json:"product_id"`
 	Quantity   int                `bson:"quantity" json:"quantity"`
 	Price      float64            `bson:"price" json:"price"`
@@ -44,43 +44,4 @@ type CartItem struct {
 	ProductID   string  `json:"product_id"`
 	ProductName string  `json:"product_name"`
 	Quantity    int     `json:"quantity"`
-}
-
-type StudentOrder struct {
-	StudentID  string     `json:"student_id"`
-	Items      []CartItem `json:"items"`
-	TotalPrice float64    `json:"total_price"`
-}
-
-type GroupedOrder struct {
-	ID              primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	TeacherID       string             `bson:"teacher_id" json:"teacher_id"`
-	Email           string             `bson:"email" json:"email"`
-	TotalPrice      float64            `bson:"total_price" json:"total_price"`
-	Status          string             `bson:"status" json:"status"`
-	StudentOrders   []StudentOrder     `bson:"student_orders" json:"student_orders"`
-	ShippingAddress Address            `bson:"shipping_address" json:"shipping_address"`
-	CreateAt        time.Time          `bson:"create_at" json:"create_at"`
-	UpdateAt        time.Time          `bson:"update_at" json:"update_at"`
-}
-
-type StudentCart struct {
-	StudentID  string     `json:"_id"`
-	Items      []CartItem `json:"items"`
-	TotalPrice float64    `json:"total_price"`
-}
-
-type CartAPIResponse struct {
-	StatusCode int           `json:"status_code"`
-	Message    string        `json:"message"`
-	Data       []StudentCart `json:"data"`
-}
-
-type UpdateStatusRequest struct {
-	Status string `json:"status"`
-}
-
-type TeacherIdRequest struct {
-	TeacherID string `json:"teacher_id"`
-	Email     string `json:"email"`
 }
