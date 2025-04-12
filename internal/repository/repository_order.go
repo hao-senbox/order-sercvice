@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log"
 	"store/internal/models"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -16,9 +18,11 @@ type OrderRepository interface {
 	GetOrderDetail(ctx context.Context, id primitive.ObjectID) (*models.GroupedOrder, error)
 	GetOrdersUser(ctx context.Context, TeacherID string) ([]*models.GroupedOrder, error)
 	CreateOrder(ctx context.Context, order models.Order) (*models.Order, error)
-	UpdateOrder(ctx context.Context, id primitive.ObjectID, orderRequest models.UpdateStatusRequest) error
+	UpdateOrder(ctx context.Context, id primitive.ObjectID, status string) error
 	DeleteOrder(ctx context.Context, id primitive.ObjectID) error
-	GetGroupedOrders(ctx context.Context, order []*models.Order) ([]*models.GroupedOrder, error)
+	UpdateOrderPaymentAndStatus(ctx context.Context, id primitive.ObjectID, payment models.Payment, status string) error
+	GetGroupedOrders(ctx context.Context, orders []*models.Order) ([]*models.GroupedOrder, error)
+	FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error)
 }
 
 type orderRepository struct {
@@ -32,7 +36,6 @@ func NewOrderRepository(collection *mongo.Collection) OrderRepository {
 }
 
 func (r *orderRepository) GetOrders(ctx context.Context, req models.SearchOrderRequest) ([]*models.GroupedOrder, int64, error) {
-	
 	filter := bson.M{}
 
 	if req.Status != "" {
@@ -51,13 +54,13 @@ func (r *orderRepository) GetOrders(ctx context.Context, req models.SearchOrderR
 	if err != nil {
 		return nil, 0, err
 	}
-	
+
 	skip := (req.Page - 1) * req.Limit
 	opts := options.Find().
 		SetSkip(int64(skip)).
 		SetLimit(int64(req.Limit)).
-		SetSort(bson.D{{Key: "create_at",Value:  -1}})
-		
+		SetSort(bson.D{{Key: "create_at", Value: -1}})
+
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, 0, err
@@ -75,7 +78,6 @@ func (r *orderRepository) GetOrders(ctx context.Context, req models.SearchOrderR
 	}
 
 	return groupedOrders, totalItems, nil
-
 }
 
 func (r *orderRepository) GetGroupedOrders(ctx context.Context, orders []*models.Order) ([]*models.GroupedOrder, error) {
@@ -130,14 +132,16 @@ func (r *orderRepository) GetGroupedOrders(ctx context.Context, orders []*models
 		// Create the grouped order
 		groupedOrder := &models.GroupedOrder{
 			ID:              order.ID,
-			TeacherID:          order.TeacherID,
+			TeacherID:       order.TeacherID,
+			OrderNumber:     order.OrderNumber,
 			Email:           order.Email,
 			TotalPrice:      order.TotalPrice,
 			Status:          order.Status,
 			StudentOrders:   studentOrders,
 			ShippingAddress: order.ShippingAddress,
-			CreatedAt:        order.CreatedAt,
-			UpdatedAt:        order.UpdatedAt,
+			Payment:         order.Payment,
+			CreatedAt:       order.CreatedAt,
+			UpdatedAt:       order.UpdatedAt,
 		}
 
 		groupedOrders = append(groupedOrders, groupedOrder)
@@ -213,24 +217,18 @@ func (r *orderRepository) CreateOrder(ctx context.Context, order models.Order) (
 
 }
 
-func (r *orderRepository) UpdateOrder(ctx context.Context, id primitive.ObjectID, orderRequest models.UpdateStatusRequest) error {
-
+func (r *orderRepository) UpdateOrder(ctx context.Context, id primitive.ObjectID, status string) error {
 	filter := bson.M{"_id": id}
-
 	update := bson.M{
 		"$set": bson.M{
-			"status": orderRequest.Status,
+			"status":     status,
+			"updated_at": time.Now(),
 		},
 	}
 
-	result, err := r.collection.UpdateOne(ctx, filter, update)
-
+	_, err := r.collection.UpdateOne(ctx, filter, update)
 	if err != nil {
-		return err
-	}
-
-	if result.MatchedCount == 0 {
-		return fmt.Errorf("no record found with id: %s", id.Hex())
+		return fmt.Errorf("failed to update order status: %w", err)
 	}
 
 	return nil
@@ -252,4 +250,45 @@ func (r *orderRepository) DeleteOrder(ctx context.Context, id primitive.ObjectID
 
 	return nil
 
+}
+
+func (r *orderRepository) UpdateOrderPaymentAndStatus(ctx context.Context, id primitive.ObjectID, payment models.Payment, status string) error {
+	filter := bson.M{"_id": id}
+	update := bson.M{
+		"$set": bson.M{
+			"payment":    payment,
+			"status":     status,
+			"updated_at": time.Now(),
+		},
+	}
+
+	_, err := r.collection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to update order payment and status: %w", err)
+	}
+
+	return nil
+}
+
+func (r *orderRepository) FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error) {
+	filter := bson.M{
+		"payment.paid":   false,
+		"status":         models.OrderStatusPending,
+		"payment.method": models.PaymentMethodBankTransfer,
+	}
+	log.Printf("Filter for unpaid orders: %+v", filter)
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("error finding unpaid orders %v", err)
+	}
+	defer cursor.Close(ctx)
+
+	var orders []*models.Order
+
+	if err := cursor.All(ctx, &orders); err != nil {
+		return nil, fmt.Errorf("error decoding orders: %w", err)
+	}
+
+	return orders, nil
 }

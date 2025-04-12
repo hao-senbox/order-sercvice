@@ -40,6 +40,8 @@ type GroupedOrder struct {
 	Status          string             `bson:"status" json:"status"`
 	StudentOrders   []StudentOrder     `bson:"student_orders" json:"student_orders"`
 	ShippingAddress Address            `bson:"shipping_address" json:"shipping_address"`
+	Payment         Payment            `bson:"payment" json:"payment"`
+	OrderNumber     string             `bson:"order_number" json:"order_number"`
 	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
 }

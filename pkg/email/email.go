@@ -33,11 +33,10 @@ func NewEmailService() *EmailService {
 
 func (es *EmailService) SendOrderConfirmation(email string, order *models.GroupedOrder) error {
 	m := gomail.NewMessage()
-	m.SetHeader("From", os.Getenv("EMAIL_FROM"))
+	m.SetHeader("From", os.Getenv("SMTP_USER"))
 	m.SetHeader("To", email)
 	m.SetHeader("Subject", "Thank you for your order")
 
-	// Create email body with CSS styling
 	body := `
 		<html>
 		<head>
@@ -50,10 +49,10 @@ func (es *EmailService) SendOrderConfirmation(email string, order *models.Groupe
 					padding: 0;
 				}
 				.header {
-					background-color: #8b4b8b;
+					background-color: #27ae60;
 					color: white;
 					padding: 20px;
-					text-align: left;
+					text-align: center;
 					font-size: 24px;
 				}
 				.container {
@@ -61,13 +60,24 @@ func (es *EmailService) SendOrderConfirmation(email string, order *models.Groupe
 					margin: 0 auto;
 					padding: 20px;
 				}
-				.message {
+				.confirmation-message {
+					background-color: #e8f5e9;
+					border-radius: 4px;
+					padding: 20px;
 					margin: 20px 0;
-					line-height: 1.6;
+					text-align: center;
+					color: #2e7d32;
+					font-size: 18px;
 				}
 				.order-info {
 					margin: 20px 0;
-					color: #8b4b8b;
+					padding: 15px;
+					background-color: #f9f9f9;
+					border-radius: 4px;
+				}
+				.order-number {
+					color: #27ae60;
+					font-weight: bold;
 				}
 				table {
 					width: 100%;
@@ -76,122 +86,84 @@ func (es *EmailService) SendOrderConfirmation(email string, order *models.Groupe
 				}
 				th {
 					background-color: #f5f5f5;
-					padding: 10px;
+					padding: 12px;
 					text-align: left;
-					border-bottom: 1px solid #ddd;
+					border-bottom: 2px solid #27ae60;
 				}
 				td {
-					padding: 10px;
-					border-bottom: 1px solid #ddd;
-				}
-				.subtotal {
-					font-weight: bold;
-				}
-				.shipping {
-					padding: 10px 0;
-				}
-				.shipping-title {
-					font-weight: bold;
-				}
-				.payment {
-					padding: 10px 0;
+					padding: 12px;
 					border-bottom: 1px solid #ddd;
 				}
 				.total {
+					font-size: 18px;
+					color: #27ae60;
 					font-weight: bold;
-					padding: 10px 0;
+					text-align: right;
+					padding: 15px 0;
 				}
-				.billing-address {
+				.shipping-info {
 					margin-top: 20px;
-					color: #8b4b8b;
+					padding: 15px;
+					background-color: #f9f9f9;
+					border-radius: 4px;
 				}
-				.address-details {
-					margin-top: 10px;
-					line-height: 1.4;
+				.note-cod {
+					background-color: #fff3cd;
+					padding: 20px;
+					border-left: 5px solid #ffc107;
+					margin: 20px 0;
+					border-radius: 4px;
+				}
+				.footer {
+					text-align: center;
+					margin-top: 30px;
+					color: #666;
+					font-size: 14px;
 				}
 			</style>
 		</head>
 		<body>
 			<div class="header">
-				Thank you for your order
+				Order Created
 			</div>
 			<div class="container">
-				<div class="message">
-					Your order has been received and is now being processed. Your order details are shown below for your reference:
+				<div class="confirmation-message">
+					Your order has been successfully created!
 				</div>
 				<div class="order-info">
-					Order #` + order.ID.Hex() + ` (` + order.CreatedAt.Format("January 2, 2006") + `)
+					<span class="order-number">Order #` + order.OrderNumber + `</span>
+					<p>Thank you for placing your order. Your order has been received and is currently being processed.</p>
 				</div>
 				<table>
 					<tr>
 						<th>Product</th>
 						<th>Quantity</th>
 						<th>Price</th>
-					</tr>`
-
-	// Add order items
-	var subtotal float64
-	for _, studentOrder := range order.StudentOrders {
-		for _, item := range studentOrder.Items {
-			itemTotal := float64(item.Quantity) * item.Price
-			subtotal += itemTotal
-			body += fmt.Sprintf(`
-					<tr>
-						<td>%s</td>
-						<td>%d</td>
-						<td>$%.2f</td>
-					</tr>`, item.ProductName, item.Quantity, item.Price)
-		}
-	}
-
-	// Add subtotal, shipping, and total
-	body += fmt.Sprintf(`
+					</tr>` + generateOrderItemsTable(order) + `
 				</table>
-				<div class="subtotal">
-					Subtotal: $%.2f
-				</div>
-				<div class="shipping">
-					<span class="shipping-title">Shipping:</span> $0.00 via Local pickup
-				</div>
-				<div class="shipping">
-					<span class="shipping-title">Shipping address:</span><br>
-					%s<br>
-					<a href="#">View on Google Maps</a>
-				</div>
-				<div class="payment">
-					<span class="shipping-title">Payment method:</span> Direct bank transfer
-				</div>
 				<div class="total">
-					Total: $%.2f (includes $%.2f Tax)
+					Total: $` + fmt.Sprintf("%.2f", order.TotalPrice) + `
 				</div>
-				<div class="billing-address">
-					<h3>Billing address</h3>
-					<div class="address-details">
-						%s<br>
-						%s<br>
-						%s<br>
-						%s %s<br>
-						Phone: %s
-					</div>
+				<div class="note-cod">
+					<h3 style="margin-top: 0; color: #856404;">Cash on Delivery (COD) Information</h3>
+					<p>💵 Please prepare the exact amount in cash to pay the delivery personnel upon receiving your order.</p>
+				</div>
+				<div class="shipping-info">
+					<h3>Delivery Information</h3>
+					<p>` + formatAddress(order.ShippingAddress) + `</p>
+				</div>
+				<div class="footer">
+					<p>We will notify you once your order has been confirmed and is being processed.</p>
+					<p>© 2024 Your Store. All rights reserved.</p>
 				</div>
 			</div>
 		</body>
-		</html>`,
-		subtotal,
-		order.ShippingAddress.Street,
-		order.TotalPrice,
-		order.TotalPrice*0.1,
-		order.ShippingAddress.Street,
-		order.ShippingAddress.City,
-		order.ShippingAddress.State,
-		order.ShippingAddress.PostalCode,
-		order.ShippingAddress.Country,
-		order.ShippingAddress.Phone)
+		</html>`
 
 	m.SetBody("text/html", body)
 
 	if err := es.dialer.DialAndSend(m); err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+		return fmt.Errorf("failed to send confirmation email: %w", err)
 	}
 
 	return nil
@@ -199,9 +171,9 @@ func (es *EmailService) SendOrderConfirmation(email string, order *models.Groupe
 
 func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.GroupedOrder) error {
 	m := gomail.NewMessage()
-	m.SetHeader("From", os.Getenv("EMAIL_FROM"))
+	m.SetHeader("From", os.Getenv("SMTP_USER"))
 	m.SetHeader("To", email)
-	m.SetHeader("Subject", "Đơn hàng của bạn đã được xác nhận")
+	m.SetHeader("Subject", "Your order has been confirmed.")
 
 	body := `
 		<html>
@@ -294,7 +266,7 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 					Your order has been confirmed and is being prepared!
 				</div>
 				<div class="order-info">
-					<span class="order-number">Order #` + order.ID.Hex() + `</span>
+					<span class="order-number">Order #` + order.OrderNumber + `</span>
 					<p>Thank you for placing your order. Your order has been confirmed and is being processed.</p>
 				</div>
 				<table>
@@ -353,6 +325,400 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 
 	if err := es.dialer.DialAndSend(m); err != nil {
 		return fmt.Errorf("failed to send confirmation email: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EmailService) SendOrderConfirmationBank(email string, order *models.GroupedOrder, bank models.BankAccount) error {
+	m := gomail.NewMessage()
+	m.SetHeader("From", os.Getenv("SMTP_USER"))
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Thank you for your order")
+
+	body := `
+		<html>
+		<head>
+			<style>
+				body {
+					font-family: Arial, sans-serif;
+					line-height: 1.6;
+					color: #333;
+					margin: 0;
+					padding: 0;
+				}
+				.header {
+					background-color: #27ae60;
+					color: white;
+					padding: 20px;
+					text-align: center;
+					font-size: 24px;
+				}
+				.container {
+					max-width: 600px;
+					margin: 0 auto;
+					padding: 20px;
+				}
+				.confirmation-message {
+					background-color: #e8f5e9;
+					border-radius: 4px;
+					padding: 20px;
+					margin: 20px 0;
+					text-align: center;
+					color: #2e7d32;
+					font-size: 18px;
+				}
+				.order-info {
+					margin: 20px 0;
+					padding: 15px;
+					background-color: #f9f9f9;
+					border-radius: 4px;
+				}
+				.order-number {
+					color: #27ae60;
+					font-weight: bold;
+				}
+				table {
+					width: 100%;
+					border-collapse: collapse;
+					margin: 20px 0;
+				}
+				th {
+					background-color: #f5f5f5;
+					padding: 12px;
+					text-align: left;
+					border-bottom: 2px solid #27ae60;
+				}
+				td {
+					padding: 12px;
+					border-bottom: 1px solid #ddd;
+				}
+				.total {
+					font-size: 18px;
+					color: #27ae60;
+					font-weight: bold;
+					text-align: right;
+					padding: 15px 0;
+				}
+				.bank-info {
+					background-color: #fff3cd;
+					padding: 20px;
+					border-left: 5px solid #ffc107;
+					margin: 20px 0;
+					border-radius: 4px;
+				}
+				.shipping-info {
+					margin-top: 20px;
+					padding: 15px;
+					background-color: #f9f9f9;
+					border-radius: 4px;
+				}
+				.footer {
+					text-align: center;
+					margin-top: 30px;
+					color: #666;
+					font-size: 14px;
+				}
+			</style>
+		</head>
+			<body>
+				<div class="header">
+					Order Created
+				</div>
+				<div class="container">
+					<div class="confirmation-message">
+						Your order has been successfully created!
+					</div>
+					<div class="order-info">
+						<span class="order-number">Order #` + order.OrderNumber + `</span>
+						<p>Thank you for placing your order. We have received your order and it is currently pending confirmation.</p>
+					</div>
+					<table>
+						<tr>
+							<th>Product</th>
+							<th>Quantity</th>
+							<th>Price</th>
+						</tr>` + generateOrderItemsTable(order) + `
+					</table>
+					<div class="total">
+						Total: $` + fmt.Sprintf("%.2f", order.TotalPrice) + `
+					</div>
+					<div class="bank-info">
+						<h3 style="margin-top: 0; color: #856404;">Bank Transfer Information</h3>
+						<p><strong>Bank Name:</strong> ` + bank.BankName + `</p>
+						<p><strong>Account Holder:</strong> ` + bank.AccountName + `</p>
+						<p><strong>Account Number:</strong> ` + bank.AccountNumber + `</p>
+						<p><strong>Transfer Note:</strong> <span style="color: #c0392b;">` + *order.Payment.TransferContent + `</span></p>
+						<p style="margin-top: 10px;">⚠️ Please make sure to include the correct transfer note to help us verify your payment quickly.</p>
+					</div>
+					<div class="shipping-info">
+						<h3>Delivery Information</h3>
+						<p>` + formatAddress(order.ShippingAddress) + `</p>
+					</div>
+					<div class="footer">
+						<p>We will notify you once your order has been confirmed and is being processed.</p>
+						<p>© 2024 Your Store. All rights reserved.</p>
+					</div>
+				</div>
+			</body>
+
+		</html>`
+
+	m.SetBody("text/html", body)
+
+	if err := es.dialer.DialAndSend(m); err != nil {
+		return fmt.Errorf("failed to send confirmation email: %w", err)
+	}
+
+	return nil
+}
+
+// Helper function to generate order items table
+func generateOrderItemsTable(order *models.GroupedOrder) string {
+	var tableRows string
+	for _, studentOrder := range order.StudentOrders {
+		for _, item := range studentOrder.Items {
+			tableRows += fmt.Sprintf(`
+					<tr>
+						<td>%s</td>
+						<td>%d</td>
+						<td>$%.2f</td>
+					</tr>`, item.ProductName, item.Quantity, item.Price)
+		}
+	}
+	return tableRows
+}
+
+// Helper function to format address
+func formatAddress(address models.Address) string {
+	return fmt.Sprintf(`%s<br>
+		%s, %s<br>
+		%s %s<br>
+		Phone: %s`,
+		address.Street,
+		address.City,
+		address.State,
+		address.PostalCode,
+		address.Country,
+		address.Phone)
+}
+
+func (es *EmailService) SendEmailNotificationAdmin(email string) error {
+	m := gomail.NewMessage()
+	m.SetHeader("From", os.Getenv("SMTP_USER"))
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "New Order Notification")
+
+	body := `
+		<html>
+		<head>
+			<style>
+				body {
+					font-family: Arial, sans-serif;
+					line-height: 1.6;
+					color: #333;
+					margin: 0;
+					padding: 0;
+				}
+				.header {
+					background-color: #3498db;
+					color: white;
+					padding: 20px;
+					text-align: center;
+					font-size: 24px;
+				}
+				.container {
+					max-width: 600px;
+					margin: 0 auto;
+					padding: 20px;
+				}
+				.notification {
+					background-color: #e3f2fd;
+					border-radius: 4px;
+					padding: 20px;
+					margin: 20px 0;
+					text-align: center;
+					color: #0d47a1;
+					font-size: 18px;
+				}
+				.action-button {
+					display: inline-block;
+					background-color: #3498db;
+					color: white;
+					padding: 10px 20px;
+					text-decoration: none;
+					border-radius: 4px;
+					margin: 20px 0;
+				}
+				.footer {
+					text-align: center;
+					margin-top: 30px;
+					color: #666;
+					font-size: 14px;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="header">
+				New Order Received
+			</div>
+			<div class="container">
+				<div class="notification">
+					A new order has been placed and requires your attention.
+				</div>
+				<div style="text-align: center;">
+					<a href="https://admin.yourstore.com/orders" class="action-button">View Orders</a>
+				</div>
+				<div class="footer">
+					<p>This is an automated message. Please do not reply to this email.</p>
+					<p>© 2024 Your Store. All rights reserved.</p>
+				</div>
+			</div>
+		</body>
+		</html>`
+
+	m.SetBody("text/html", body)
+
+	if err := es.dialer.DialAndSend(m); err != nil {
+		return fmt.Errorf("failed to send admin notification email: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EmailService) SendOrderCancellation(email string, order *models.GroupedOrder) error {
+	m := gomail.NewMessage()
+	m.SetHeader("From", os.Getenv("SMTP_USER"))
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Order Cancellation Notice")
+
+	body := `
+		<html>
+		<head>
+			<style>
+				body {
+					font-family: Arial, sans-serif;
+					line-height: 1.6;
+					color: #333;
+					margin: 0;
+					padding: 0;
+				}
+				.header {
+					background-color: #e74c3c;
+					color: white;
+					padding: 20px;
+					text-align: center;
+					font-size: 24px;
+				}
+				.container {
+					max-width: 600px;
+					margin: 0 auto;
+					padding: 20px;
+				}
+				.message {
+					background-color: #fde8e7;
+					border-radius: 4px;
+					padding: 20px;
+					margin: 20px 0;
+					text-align: center;
+					color: #c0392b;
+					font-size: 18px;
+				}
+				.order-info {
+					margin: 20px 0;
+					padding: 15px;
+					background-color: #f9f9f9;
+					border-radius: 4px;
+				}
+				.order-number {
+					color: #e74c3c;
+					font-weight: bold;
+				}
+				table {
+					width: 100%;
+					border-collapse: collapse;
+					margin: 20px 0;
+				}
+				th {
+					background-color: #f5f5f5;
+					padding: 12px;
+					text-align: left;
+					border-bottom: 2px solid #e74c3c;
+				}
+				td {
+					padding: 12px;
+					border-bottom: 1px solid #ddd;
+				}
+				.total {
+					font-size: 18px;
+					color: #e74c3c;
+					font-weight: bold;
+					text-align: right;
+					padding: 15px 0;
+				}
+				.next-steps {
+					background-color: #f9f9f9;
+					padding: 20px;
+					border-radius: 4px;
+					margin: 20px 0;
+				}
+				.next-steps h3 {
+					color: #2c3e50;
+					margin-top: 0;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="header">
+				Order Cancelled
+			</div>
+			<div class="container">
+				<div class="message">
+					Your order has been cancelled due to non-payment
+				</div>
+				<div class="order-info">
+					<span class="order-number">Order #` + order.OrderNumber + `</span>
+					<p>We regret to inform you that your order has been cancelled as we did not receive payment within the required timeframe.</p>
+				</div>
+				<table>
+					<tr>
+						<th>Product</th>
+						<th>Quantity</th>
+						<th>Price</th>
+					</tr>`
+
+	var subtotal float64
+	for _, studentOrder := range order.StudentOrders {
+		for _, item := range studentOrder.Items {
+			itemTotal := float64(item.Quantity) * item.Price
+			subtotal += itemTotal
+			body += fmt.Sprintf(`
+					<tr>
+						<td>%s</td>
+						<td>%d</td>
+						<td>$%.2f</td>
+					</tr>`, item.ProductName, item.Quantity, item.Price)
+		}
+	}
+
+	body += fmt.Sprintf(`
+				</table>
+				<div class="total">
+					Total: $%.2f
+				</div>
+				<div class="next-steps">
+					<h3>What to do next?</h3>
+					<p>1. You can place a new order if you still wish to purchase these items</p>
+					<p>2. Contact our customer support if you have any questions</p>
+				</div>
+			</div>
+		</body>
+		</html>`, order.TotalPrice)
+
+	m.SetBody("text/html", body)
+
+	if err := es.dialer.DialAndSend(m); err != nil {
+		return fmt.Errorf("failed to send cancellation email: %w", err)
 	}
 
 	return nil

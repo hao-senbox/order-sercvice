@@ -7,6 +7,7 @@ type UpdateStatusRequest struct {
 type TeacherRequest struct {
 	TeacherID string `json:"teacher_id" validate:"required"`
 	Email     string `json:"email" validate:"required,email"`
+	Types	 string `json:"types" validate:"required,oneof=cod bank_transfer"`
 }
 
 type SearchOrderRequest struct {
