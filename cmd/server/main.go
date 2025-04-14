@@ -65,7 +65,7 @@ func main() {
 	c := cronV3.New(cronV3.WithSeconds(), cronV3.WithLogger(cronV3.DefaultLogger))
 	
 	// Thêm job hủy đơn hàng mỗi giờ
-	_, err = c.AddFunc("*/30 * * * * *", func() {  // Chạy mỗi giờ tại phút thứ 0, giây thứ 0
+	_, err = c.AddFunc("0 0 * * * *", func() { // Chạy mỗi giờ tại phút thứ 0, giây thứ 0
 		log.Println("Bắt đầu chạy job hủy đơn hàng chưa thanh toán...")
 		ctx := context.Background()
 		if err := orderService.CancelUnpaidOrders(ctx); err != nil {

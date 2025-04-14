@@ -3,10 +3,8 @@ package repository
 import (
 	"context"
 	"fmt"
-	"log"
 	"store/internal/models"
 	"time"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -273,10 +271,10 @@ func (r *orderRepository) UpdateOrderPaymentAndStatus(ctx context.Context, id pr
 func (r *orderRepository) FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error) {
 	filter := bson.M{
 		"payment.paid":   false,
+		"created_at": bson.M{"$lt": timestamp},
 		"status":         models.OrderStatusPending,
 		"payment.method": models.PaymentMethodBankTransfer,
 	}
-	log.Printf("Filter for unpaid orders: %+v", filter)
 
 	cursor, err := r.collection.Find(ctx, filter)
 	if err != nil {

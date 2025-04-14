@@ -42,7 +42,7 @@ func RegisterHandlers(router *gin.Engine, orderService service.OrderService) {
 
 func (h *OrderHandlers) CreateOrder(c *gin.Context) {
 
-	var req models.TeacherRequest
+	var req models.CreateOrderRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		SendError(c, http.StatusBadRequest, err, models.ErrInvalidRequest)

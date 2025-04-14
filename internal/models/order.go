@@ -37,14 +37,11 @@ type OrderItem struct {
 }
 
 type Address struct {
-	Type       string `bson:"type" json:"type"`
 	Street     string `bson:"street" json:"street"`
 	City       string `bson:"city" json:"city"`
-	State      string `bson:"state" json:"state"`
+	State      *string `bson:"state,omitempty" json:"state"`
 	Country    string `bson:"country" json:"country"`
-	PostalCode string `bson:"postal_code" json:"postal_code"`
 	Phone      string `bson:"phone" json:"phone"`
-	IsDefault  bool   `bson:"is_default" json:"is_default"`
 }
 
 type Payment struct {

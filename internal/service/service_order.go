@@ -22,7 +22,7 @@ type OrderService interface {
 	GetGroupedOrders(ctx context.Context, req models.SearchOrderRequest) ([]*models.GroupedOrder, int64, error)
 	GetOrderDetail(ctx context.Context, id string) (*models.GroupedOrder, error)
 	GetOrdersUser(ctx context.Context, userID string) ([]*models.GroupedOrder, error)
-	CreateOrder(ctx context.Context, req *models.TeacherRequest) (*models.Order, error)
+	CreateOrder(ctx context.Context, req *models.CreateOrderRequest) (*models.Order, error)
 	DeleteOrder(ctx context.Context, id string) error
 	VerifyPayment(ctx context.Context, orderID string) error
 	CancelUnpaidOrder(ctx context.Context, orderID string) error
@@ -80,9 +80,8 @@ func (s *orderService) GetOrdersUser(ctx context.Context, TeacherID string) ([]*
 	return s.orderRepo.GetOrdersUser(ctx, TeacherID)
 }
 
-func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherRequest) (*models.Order, error) {
-	fmt.Printf("Creating order for user: %s\n", req.TeacherID)
-
+func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderRequest) (*models.Order, error) {
+	
 	cartData := s.cartAPI.GetCartByUserID(req.TeacherID)
 	if cartData == nil {
 		return nil, fmt.Errorf("failed to get cart data")
@@ -150,14 +149,11 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherReque
 		Status:      status,
 		Items:       orderItems,
 		ShippingAddress: models.Address{
-			Type:       "home",
-			Street:     "123 Đường Láng",
-			City:       "Hà Nội",
-			State:      "Hà Nội",
-			Country:    "Việt Nam",
-			PostalCode: "100000",
-			Phone:      "0912345678",
-			IsDefault:  true,
+			Street:     req.Street,
+			City:       req.City,
+			State:      req.State,
+			Country:    req.Country,
+			Phone:      req.Phone,
 		},
 		Payment:   payment,
 		CreatedAt: time.Now(),
@@ -201,21 +197,6 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.TeacherReque
 			} else {
 				log.Printf("order notification email sent to: %s\n", os.Getenv("SMTP_USER"))
 			}
-
-			// Schedule order cancellation if not paid within 3 days
-			go func(orderID string) {
-				time.Sleep(30 * time.Second)
-				ctx := context.Background()
-				objectID, err := primitive.ObjectIDFromHex(orderID)
-				if err != nil {
-					log.Printf("Invalid order ID for cancellation: %v", err)
-					return
-				}
-				order, err := s.orderRepo.GetOrderDetail(ctx, objectID)
-				if err == nil && order != nil && !order.Payment.Paid {
-					s.CancelUnpaidOrder(ctx, orderID)
-				}
-			}(savedOrder.ID.Hex())
 		}
 	}
 
@@ -364,7 +345,7 @@ func (s *orderService) CancelUnpaidOrder(ctx context.Context, orderID string) er
 }
 
 func (s *orderService) CancelUnpaidOrders(ctx context.Context) error {
-	threshold := time.Now().Add(-3 * 24 * time.Hour)
+	threshold := time.Now().Add(-1 * 24 * time.Hour)
 
 	unpaidOrders, err := s.orderRepo.FindUnPaidOrdersBeforeTime(ctx, threshold, models.OrderStatusPending)
 	if err != nil {

@@ -289,7 +289,10 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 					</tr>`, item.ProductName, item.Quantity, item.Price)
 		}
 	}
-
+	state := ""
+	if order.ShippingAddress.State != nil {
+		state = *order.ShippingAddress.State
+	}
 	body += fmt.Sprintf(`
 				</table>
 				<div class="total">
@@ -299,15 +302,14 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 					<h3>Delivery information</h3>
 					<p>
 						%s<br>
-						%s, %s<br>
-						%s %s<br>
+						%s %s %s<br>
 						Phone: %s
 					</p>
 				</div>
 				<div class="next-steps">
 					<h3>Next steps</h3>
 					<p>1. Your order is being prepared</p>
-					<p>2. You will receive an email when your order is delivered to the shipping carrier.</p>
+					<p>2. Please keep an eye on your phone to receive the goods from the delivery person.</p>
 					<p>3. Track your order through your account</p>
 				</div>
 			</div>
@@ -316,8 +318,7 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 		order.TotalPrice,
 		order.ShippingAddress.Street,
 		order.ShippingAddress.City,
-		order.ShippingAddress.State,
-		order.ShippingAddress.PostalCode,
+		state,
 		order.ShippingAddress.Country,
 		order.ShippingAddress.Phone)
 
@@ -491,14 +492,17 @@ func generateOrderItemsTable(order *models.GroupedOrder) string {
 
 // Helper function to format address
 func formatAddress(address models.Address) string {
+	state := ""
+	if address.State != nil {
+		state = *address.State
+	}
 	return fmt.Sprintf(`%s<br>
 		%s, %s<br>
-		%s %s<br>
+		%s<br>
 		Phone: %s`,
 		address.Street,
 		address.City,
-		address.State,
-		address.PostalCode,
+		state,
 		address.Country,
 		address.Phone)
 }

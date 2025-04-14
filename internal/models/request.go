@@ -4,10 +4,15 @@ type UpdateStatusRequest struct {
 	Status string `json:"status" validate:"required,oneof=pending processing completed cancelled"`
 }
 
-type TeacherRequest struct {
-	TeacherID string `json:"teacher_id" validate:"required"`
-	Email     string `json:"email" validate:"required,email"`
-	Types	 string `json:"types" validate:"required,oneof=cod bank_transfer"`
+type CreateOrderRequest struct {
+	TeacherID string  `json:"teacher_id" validate:"required"`
+	Email     string  `json:"email" validate:"required,email"`
+	Types     string  `json:"types" validate:"required,oneof=cod bank_transfer"`
+	Street    string  `json:"street" validate:"required"`
+	City      string  `json:"city" validate:"required"`
+	State     *string `json:"state"`
+	Country   string  `json:"country" validate:"required"`
+	Phone     string  `json:"phone" validate:"required"`
 }
 
 type SearchOrderRequest struct {
