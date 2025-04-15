@@ -5,15 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"store/internal/models"
 	"store/internal/repository"
 	"store/pkg/consul"
 	"store/pkg/email"
+	"sync"
 	"time"
-
 	"github.com/hashicorp/consul/api"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -44,6 +43,9 @@ type callAPI struct {
 
 var (
 	getCartUser = "cart-service"
+	orderMutex sync.Mutex
+	lastOrderDate string
+	counter uint32
 )
 
 func NewOrderService(orderRepo repository.OrderRepository, client *api.Client) OrderService {
@@ -183,7 +185,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderR
 				fmt.Printf("order confirmation email sent to: %s\n", req.Email)
 			}
 
-			if err := s.emailService.SendEmailNotificationAdmin(os.Getenv("SMTP_USER")); err != nil {
+			if err := s.emailService.SendEmailNotificationAdmin(os.Getenv("SMTP_USER"), groupedOrder[0]); err != nil {
 				fmt.Printf("failed to send notification email: %v\n", err)
 			} else {
 				log.Printf("order notification email sent to: %s\n", os.Getenv("SMTP_USER"))
@@ -195,7 +197,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderR
 				fmt.Printf("order confirmation email sent to: %s\n", req.Email)
 			}
 
-			if err := s.emailService.SendEmailNotificationAdmin(os.Getenv("SMTP_USER")); err != nil {
+			if err := s.emailService.SendEmailNotificationAdmin(os.Getenv("SMTP_USER"), groupedOrder[0]); err != nil {
 				fmt.Printf("failed to send notification email: %v\n", err)
 			} else {
 				log.Printf("order notification email sent to: %s\n", os.Getenv("SMTP_USER"))
@@ -264,9 +266,21 @@ func (c *callAPI) GetCartByUserID(UserID string) interface{} {
 }
 
 func generateOrderNumber() string {
-	timestamp := time.Now().Format("20060102150405") // YYYYMMDDhhmmss
-	randomNum := 100 + rand.Intn(900)
-	return fmt.Sprintf("DH%s%d", timestamp, randomNum)
+
+    orderMutex.Lock()
+    defer orderMutex.Unlock()
+    
+    now := time.Now()
+    today := now.Format("060102") 
+    
+    if today != lastOrderDate {
+        lastOrderDate = today
+        counter = 0
+    }
+    
+    counter++
+    
+    return fmt.Sprintf("DH%s%04d", today, counter)
 }
 
 func (r *orderService) GetBankAccountInfor() models.BankAccount {

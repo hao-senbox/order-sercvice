@@ -167,7 +167,7 @@ func (es *EmailService) SendOrderConfirmation(email string, order *models.Groupe
 	}
 
 	return nil
-}						
+}
 
 func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.GroupedOrder) error {
 	m := gomail.NewMessage()
@@ -506,7 +506,7 @@ func formatAddress(address models.Address) string {
 		address.Phone)
 }
 
-func (es *EmailService) SendEmailNotificationAdmin(email string) error {
+func (es *EmailService) SendEmailNotificationAdmin(email string, order *models.GroupedOrder) error {
 	m := gomail.NewMessage()
 	m.SetHeader("From", os.Getenv("SMTP_USER"))
 	m.SetHeader("To", email)
@@ -544,6 +544,44 @@ func (es *EmailService) SendEmailNotificationAdmin(email string) error {
 					color: #0d47a1;
 					font-size: 18px;
 				}
+				.order-info {
+					margin: 20px 0;
+					padding: 15px;
+					background-color: #f9f9f9;
+					border-radius: 4px;
+				}
+				.order-number {
+					color: #3498db;
+					font-weight: bold;
+				}
+				table {
+					width: 100%;
+					border-collapse: collapse;
+					margin: 20px 0;
+				}
+				th {
+					background-color: #f5f5f5;
+					padding: 12px;
+					text-align: left;
+					border-bottom: 2px solid #3498db;
+				}
+				td {
+					padding: 12px;
+					border-bottom: 1px solid #ddd;
+				}
+				.total {
+					font-size: 18px;
+					color: #3498db;
+					font-weight: bold;
+					text-align: right;
+					padding: 15px 0;
+				}
+				.shipping-info {
+					margin-top: 20px;
+					padding: 15px;
+					background-color: #f9f9f9;
+					border-radius: 4px;
+				}
 				.action-button {
 					display: inline-block;
 					background-color: #3498db;
@@ -553,11 +591,15 @@ func (es *EmailService) SendEmailNotificationAdmin(email string) error {
 					border-radius: 4px;
 					margin: 20px 0;
 				}
-				.footer {
-					text-align: center;
-					margin-top: 30px;
-					color: #666;
-					font-size: 14px;
+				.action-button:hover {
+					background-color: #2980b9;
+				}
+				.payment-info {
+					background-color: #e3f2fd;
+					padding: 20px;
+					border-left: 5px solid #3498db;
+					margin: 20px 0;
+					border-radius: 4px;
 				}
 			</style>
 		</head>
@@ -569,8 +611,33 @@ func (es *EmailService) SendEmailNotificationAdmin(email string) error {
 				<div class="notification">
 					A new order has been placed and requires your attention.
 				</div>
+				<div class="order-info">
+					<span class="order-number">Order #` + order.OrderNumber + `</span>
+					<p>Order Date: ` + order.CreatedAt.Format("January 2, 2006 15:04:05") + `</p>
+					<p>Status: ` + order.Status + `</p>
+				</div>
+				<table>
+					<tr>
+						<th>Product</th>
+						<th>Quantity</th>
+						<th>Price</th>
+					</tr>` + generateOrderItemsTable(order) + `
+				</table>
+				<div class="total">
+					Total: $` + fmt.Sprintf("%.2f", order.TotalPrice) + `
+				</div>
+				<div class="payment-info">
+					<h3 style="margin-top: 0; color: #0d47a1;">Payment Information</h3>
+					<p><strong>Payment Method:</strong> ` + order.Payment.Method + `</p>
+					<p><strong>Payment Status:</strong> ` + order.Status + `</p>
+					<p><strong>Transfer Note:</strong> ` + *order.Payment.TransferContent + `</p>
+				</div>
+				<div class="shipping-info">
+					<h3>Delivery Information</h3>
+					<p>` + formatAddress(order.ShippingAddress) + `</p>
+				</div>
 				<div style="text-align: center;">
-					<a href="https://admin.yourstore.com/orders" class="action-button">View Orders</a>
+					<a href="https://admin.yourstore.com/orders" class="action-button">View Order Details</a>
 				</div>
 			</div>
 		</body>
