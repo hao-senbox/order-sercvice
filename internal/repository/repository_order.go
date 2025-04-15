@@ -3,8 +3,10 @@ package repository
 import (
 	"context"
 	"fmt"
+	"math"
 	"store/internal/models"
 	"time"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -21,6 +23,8 @@ type OrderRepository interface {
 	UpdateOrderPaymentAndStatus(ctx context.Context, id primitive.ObjectID, payment models.Payment, status string) error
 	GetGroupedOrders(ctx context.Context, orders []*models.Order) ([]*models.GroupedOrder, error)
 	FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error)
+	FindOrdersForReminder(ctx context.Context, startTime, endTime time.Time) ([]*models.Order, error)
+	MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error 
 }
 
 type orderRepository struct {
@@ -40,12 +44,9 @@ func (r *orderRepository) GetOrders(ctx context.Context, req models.SearchOrderR
 		filter["status"] = req.Status
 	}
 
-	if req.OrderId != "" {
-		orderID, err := primitive.ObjectIDFromHex(req.OrderId)
-		if err != nil {
-			return nil, 0, fmt.Errorf("invalid order ID")
-		}
-		filter["_id"] = orderID
+	if req.OrderNumber != "" {
+		orderNumber := req.OrderNumber
+		filter["order_number"] = orderNumber
 	}
 
 	totalItems, err := r.collection.CountDocuments(ctx, filter)
@@ -100,7 +101,7 @@ func (r *orderRepository) GetGroupedOrders(ctx context.Context, orders []*models
 			for _, item := range items {
 				total += item.TotalPrice
 			}
-			studentTotals[studentID] = total
+			studentTotals[studentID] = math.Round(total*100) / 100
 		}
 
 		// Create student orders array
@@ -133,7 +134,7 @@ func (r *orderRepository) GetGroupedOrders(ctx context.Context, orders []*models
 			TeacherID:       order.TeacherID,
 			OrderNumber:     order.OrderNumber,
 			Email:           order.Email,
-			TotalPrice:      order.TotalPrice,
+			TotalPrice:      math.Round(order.TotalPrice*100) / 100,
 			Status:          order.Status,
 			StudentOrders:   studentOrders,
 			ShippingAddress: order.ShippingAddress,
@@ -290,3 +291,49 @@ func (r *orderRepository) FindUnPaidOrdersBeforeTime(ctx context.Context, timest
 
 	return orders, nil
 }
+
+func (r *orderRepository) FindOrdersForReminder(ctx context.Context, startTime, endTime time.Time) ([]*models.Order, error) {
+	
+	filter := bson.M{
+		"payment.paid": false,
+		"status": models.OrderStatusPending,
+		"payment.method": models.PaymentMethodBankTransfer,
+		"reminder_sent": bson.M{"$ne": true},
+		"created_at": bson.M{"$gte": endTime, "$lte": startTime},
+	}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("error finding orders for reminder: %v", err)
+	}
+	defer cursor.Close(ctx)
+
+	var orders []*models.Order
+	if err := cursor.All(ctx, &orders); err != nil {
+		return nil, fmt.Errorf("error decoding orders: %w", err)
+	}
+
+	return orders, nil
+}
+
+func (r *orderRepository) MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error {
+	
+	update := bson.M{
+		"$set": bson.M{
+			"reminder_sent": true,
+			"reminder_sent_at": time.Now(),
+		},
+	}
+
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": orderID},
+		update,
+	)
+	if err != nil {
+		return fmt.Errorf("error updating reminder status: %w", err)
+	}
+
+	return nil
+}
+

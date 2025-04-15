@@ -27,6 +27,7 @@ type OrderService interface {
 	VerifyPayment(ctx context.Context, orderID string) error
 	CancelUnpaidOrder(ctx context.Context, orderID string) error
 	CancelUnpaidOrders(ctx context.Context) error
+	SentPaymentReminders(ctx context.Context) error
 }
 
 type orderService struct {
@@ -156,6 +157,8 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderR
 			Phone:      req.Phone,
 		},
 		Payment:   payment,
+		ReminderSent: false,
+		ReminderSentAt: nil,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -363,4 +366,53 @@ func (s *orderService) CancelUnpaidOrders(ctx context.Context) error {
 		log.Printf("Successfully cancelled unpaid order: %s", order.ID.Hex())
 	}
 	return nil 
+}
+
+func (s *orderService) SentPaymentReminder(ctx context.Context, orderID primitive.ObjectID, hoursLeft int) error {
+
+	order, err := s.orderRepo.GetOrderDetail(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("order not found")
+	}
+
+	if order.Email != "" {
+		if err := s.emailService.SendReminderOrder(order.Email, order, hoursLeft, s.bankAccount); err != nil {
+			fmt.Printf("failed to send cancellation email: %v\n", err)
+		}
+	}
+
+	return nil
+
+
+} 
+
+func (s *orderService) SentPaymentReminders(ctx context.Context) error {
+	
+	reminderTime := time.Now().Add(-20 * time.Hour)
+	endTime := time.Now().Add(-22 * time.Hour)
+
+	unpaidOrders, err := s.orderRepo.FindOrdersForReminder(ctx, reminderTime, endTime)
+	if err != nil {
+		log.Printf("Error finding orders for payment reminder: %v", err)
+        return err
+	}
+
+	log.Printf("Found %d unpaid orders needing payment reminder", len(unpaidOrders))
+
+	for _, order := range unpaidOrders {
+		hoursLeft := int(24 - time.Since(order.CreatedAt).Hours())
+
+		if err := s.SentPaymentReminder(ctx, order.ID, hoursLeft); err != nil {
+			log.Printf("Failed to send reminder for order %s: %v", order.ID.Hex(), err)
+            continue
+		}
+
+		if err := s.orderRepo.MarkReminderSent(ctx, order.ID); err != nil {
+			log.Printf("Failed to mark reminder sent for order %s: %v", order.ID.Hex(), err)
+		}
+
+		log.Printf("Successfully sent payment reminder for order: %s", order.ID.Hex())
+	}
+
+	return nil
 }

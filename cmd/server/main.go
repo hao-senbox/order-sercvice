@@ -66,14 +66,23 @@ func main() {
 	
 	// Thêm job hủy đơn hàng mỗi giờ
 	_, err = c.AddFunc("0 0 * * * *", func() { // Chạy mỗi giờ tại phút thứ 0, giây thứ 0
-		log.Println("Bắt đầu chạy job hủy đơn hàng chưa thanh toán...")
+		
+		log.Println("Bắt đầu chạy job...")
 		ctx := context.Background()
+
 		if err := orderService.CancelUnpaidOrders(ctx); err != nil {
 			log.Printf("Lỗi khi hủy đơn hàng chưa thanh toán: %v", err)
 		} else {
 			log.Println("Job hủy đơn hàng chưa thanh toán hoàn thành")
 		}
+
+		if err := orderService.SentPaymentReminders(ctx); err != nil {
+			log.Printf("Lỗi khi gửi nhắc nhở thanh toán: %v", err)
+		} else {
+			log.Println("Job nhắc nhở thanh toán hoàn thành")
+		}
 	})
+
 	
 	if err != nil {
 		log.Printf("Lỗi khi thiết lập cron job: %v", err)

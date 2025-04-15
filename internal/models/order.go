@@ -7,10 +7,10 @@ import (
 )
 
 const (
-	OrderStatusPending     = "pending"
-	OrderStatusProcessing  = "processing"
-	OrderStatusCompleted   = "completed"
-	OrderStatusCanceled    = "canceled"
+	OrderStatusPending    = "pending"
+	OrderStatusProcessing = "processing"
+	OrderStatusCompleted  = "completed"
+	OrderStatusCanceled   = "canceled"
 )
 
 type Order struct {
@@ -19,10 +19,12 @@ type Order struct {
 	TeacherID       string             `bson:"teacher_id" json:"teacher_id"`
 	Email           string             `bson:"email" json:"email"`
 	TotalPrice      float64            `bson:"total_price" json:"total_price"`
-	Status          string        `bson:"status" json:"status"`
+	Status          string             `bson:"status" json:"status"`
 	Items           []OrderItem        `bson:"items" json:"items"`
 	ShippingAddress Address            `bson:"shipping_address" json:"shipping_address"`
 	Payment         Payment            `bson:"payment" json:"payment"`
+	ReminderSent    bool               `bson:"reminder_sent,omitempty"`
+	ReminderSentAt  *time.Time          `bson:"reminder_sent_at,omitempty"`
 	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
 }
@@ -37,11 +39,11 @@ type OrderItem struct {
 }
 
 type Address struct {
-	Street     string `bson:"street" json:"street"`
-	City       string `bson:"city" json:"city"`
-	State      *string `bson:"state,omitempty" json:"state"`
-	Country    string `bson:"country" json:"country"`
-	Phone      string `bson:"phone" json:"phone"`
+	Street  string  `bson:"street" json:"street"`
+	City    string  `bson:"city" json:"city"`
+	State   *string `bson:"state,omitempty" json:"state"`
+	Country string  `bson:"country" json:"country"`
+	Phone   string  `bson:"phone" json:"phone"`
 }
 
 type Payment struct {

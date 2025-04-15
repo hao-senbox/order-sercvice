@@ -16,8 +16,8 @@ type CreateOrderRequest struct {
 }
 
 type SearchOrderRequest struct {
-	Page    int    `form:"page" json:"page" validate:"min=1"`
-	Limit   int    `form:"limit" json:"limit" validate:"min=1,max=100"`
-	Status  string `form:"status" json:"status" validate:"omitempty,oneof=pending processing completed cancelled"`
-	OrderId string `form:"order_id" json:"order_id" validate:"omitempty,hexadecimal"`
+	Page        int    `form:"page" json:"page" validate:"min=1"`
+	Limit       int    `form:"limit" json:"limit" validate:"min=1,max=100"`
+	Status      string `form:"status" json:"status" validate:"omitempty,oneof=pending processing completed cancelled"`
+	OrderNumber string `form:"order_number" json:"order_number" validate:"omitempty"`
 }

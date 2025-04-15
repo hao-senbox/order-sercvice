@@ -167,7 +167,7 @@ func (es *EmailService) SendOrderConfirmation(email string, order *models.Groupe
 	}
 
 	return nil
-}
+}						
 
 func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.GroupedOrder) error {
 	m := gomail.NewMessage()
@@ -433,6 +433,17 @@ func (es *EmailService) SendOrderConfirmationBank(email string, order *models.Gr
 					<div class="order-info">
 						<span class="order-number">Order #` + order.OrderNumber + `</span>
 						<p>Thank you for placing your order. We have received your order and it is currently pending confirmation.</p>
+						<div>
+							<div class="bank-info">
+								<h3 style="margin-top: 0; color: #856404;">Bank Transfer Information</h3>
+								<p><strong>Bank Name:</strong> ` + bank.BankName + `</p>
+								<p><strong>Account Holder:</strong> ` + bank.AccountName + `</p>
+								<p><strong>Account Number:</strong> ` + bank.AccountNumber + `</p>
+								<p><strong>Total Price:</strong> $` + fmt.Sprintf("%.2f", order.TotalPrice) + `</p>
+								<p><strong>Transfer Note:</strong> <span style="color: #c0392b;">` + *order.Payment.TransferContent + `</span></p>
+								<p style="margin-top: 10px;">⚠️ Please make sure to include the correct transfer note to help us verify your payment quickly.</p>
+							</div>
+						<div>
 					</div>
 					<table>
 						<tr>
@@ -444,21 +455,9 @@ func (es *EmailService) SendOrderConfirmationBank(email string, order *models.Gr
 					<div class="total">
 						Total: $` + fmt.Sprintf("%.2f", order.TotalPrice) + `
 					</div>
-					<div class="bank-info">
-						<h3 style="margin-top: 0; color: #856404;">Bank Transfer Information</h3>
-						<p><strong>Bank Name:</strong> ` + bank.BankName + `</p>
-						<p><strong>Account Holder:</strong> ` + bank.AccountName + `</p>
-						<p><strong>Account Number:</strong> ` + bank.AccountNumber + `</p>
-						<p><strong>Transfer Note:</strong> <span style="color: #c0392b;">` + *order.Payment.TransferContent + `</span></p>
-						<p style="margin-top: 10px;">⚠️ Please make sure to include the correct transfer note to help us verify your payment quickly.</p>
-					</div>
 					<div class="shipping-info">
 						<h3>Delivery Information</h3>
 						<p>` + formatAddress(order.ShippingAddress) + `</p>
-					</div>
-					<div class="footer">
-						<p>We will notify you once your order has been confirmed and is being processed.</p>
-						<p>© 2024 Your Store. All rights reserved.</p>
 					</div>
 				</div>
 			</body>
@@ -572,10 +571,6 @@ func (es *EmailService) SendEmailNotificationAdmin(email string) error {
 				</div>
 				<div style="text-align: center;">
 					<a href="https://admin.yourstore.com/orders" class="action-button">View Orders</a>
-				</div>
-				<div class="footer">
-					<p>This is an automated message. Please do not reply to this email.</p>
-					<p>© 2024 Your Store. All rights reserved.</p>
 				</div>
 			</div>
 		</body>
@@ -723,6 +718,165 @@ func (es *EmailService) SendOrderCancellation(email string, order *models.Groupe
 
 	if err := es.dialer.DialAndSend(m); err != nil {
 		return fmt.Errorf("failed to send cancellation email: %w", err)
+	}
+
+	return nil
+}
+
+func (es *EmailService) SendReminderOrder(email string, order *models.GroupedOrder, hoursLeft int, bank models.BankAccount) error {
+	m := gomail.NewMessage()
+	m.SetHeader("From", os.Getenv("SMTP_USER"))
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Payment Reminder for Your Order")
+
+	body := `
+		<html>
+		<head>
+			<style>
+				body {
+					font-family: Arial, sans-serif;
+					line-height: 1.6;
+					color: #333;
+					margin: 0;
+					padding: 0;
+				}
+				.header {
+					background-color: #f39c12;
+					color: white;
+					padding: 20px;
+					text-align: center;
+					font-size: 24px;
+				}
+				.container {
+					max-width: 600px;
+					margin: 0 auto;
+					padding: 20px;
+				}
+				.message {
+					background-color: #fff3cd;
+					border-radius: 4px;
+					padding: 20px;
+					margin: 20px 0;
+					text-align: center;
+					color: #85640a;
+					font-size: 18px;
+				}
+				.order-info {
+					margin: 20px 0;
+					padding: 15px;
+					background-color: #f9f9f9;
+					border-radius: 4px;
+				}
+				.order-number {
+					color: #f39c12;
+					font-weight: bold;
+				}
+				.reminder {
+					color: #d35400;
+					font-weight: bold;
+				}
+				table {
+					width: 100%;
+					border-collapse: collapse;
+					margin: 20px 0;
+				}
+				th {
+					background-color: #f5f5f5;
+					padding: 12px;
+					text-align: left;
+					border-bottom: 2px solid #f39c12;
+				}
+				td {
+					padding: 12px;
+					border-bottom: 1px solid #ddd;
+				}
+				.total {
+					font-size: 18px;
+					color: #f39c12;
+					font-weight: bold;
+					text-align: right;
+					padding: 15px 0;
+				}
+				.action-button {
+					display: inline-block;
+					padding: 10px 20px;
+					background-color: #27ae60;
+					color: white;
+					text-decoration: none;
+					border-radius: 5px;
+					margin-top: 15px;
+				}
+				.action-button:hover {
+					background-color: #219653;
+				}
+				.bank-info {
+					background-color: #fff3cd;
+					padding: 20px;
+					border-left: 5px solid #ffc107;
+					margin: 20px 0;
+					border-radius: 4px;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="header">
+				Payment Reminder
+			</div>
+			<div class="container">
+				<div class="message">
+					Don't forget to complete your order!
+				</div>
+				<div class="order-info">
+					<span class="order-number">Order #` + order.OrderNumber + `</span>
+					<p>This is a friendly reminder that your order is awaiting payment. You have <span class="reminder">` + fmt.Sprintf("%d hours", hoursLeft) + `</span> left to complete your purchase before it is automatically cancelled.</p>
+					<div>
+						<div class="bank-info">
+							<h3 style="margin-top: 0; color: #856404;">Bank Transfer Information</h3>
+							<p><strong>Bank Name:</strong> ` + bank.BankName + `</p>
+							<p><strong>Account Holder:</strong> ` + bank.AccountName + `</p>
+							<p><strong>Account Number:</strong> ` + bank.AccountNumber + `</p>
+							<p><strong>Total Price:</strong> $` + fmt.Sprintf("%.2f", order.TotalPrice) + `</p>
+							<p><strong>Transfer Note:</strong> <span style="color: #c0392b;">` + *order.Payment.TransferContent + `</span></p>
+							<p style="margin-top: 10px;">⚠️ Please make sure to include the correct transfer note to help us verify your payment quickly.</p>
+						</div>
+					<div>
+					</div>
+				<table>
+					<tr>
+						<th>Product</th>
+						<th>Quantity</th>
+						<th>Price</th>
+					</tr>`
+
+	var subtotal float64
+	for _, studentOrder := range order.StudentOrders {
+		for _, item := range studentOrder.Items {
+			itemTotal := float64(item.Quantity) * item.Price
+			subtotal += itemTotal
+			body += fmt.Sprintf(`
+					<tr>
+						<td>%s</td>
+						<td>%d</td>
+						<td>$%.2f</td>
+					</tr>`, item.ProductName, item.Quantity, item.Price)
+		}
+	}
+
+	body += fmt.Sprintf(`
+				</table>
+				<div class="total">
+					Total: $%.2f
+				</div>
+				<p>If you have already made the payment, please disregard this email.</p>
+				<p>If you have any questions, please contact our customer support.</p>
+			</div>
+		</body>
+		</html>`, order.TotalPrice)
+
+	m.SetBody("text/html", body)
+
+	if err := es.dialer.DialAndSend(m); err != nil {
+		return fmt.Errorf("failed to send payment reminder email: %w", err)
 	}
 
 	return nil
