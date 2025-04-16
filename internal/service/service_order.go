@@ -25,8 +25,8 @@ type OrderService interface {
 	DeleteOrder(ctx context.Context, id string) error
 	VerifyPayment(ctx context.Context, orderID string) error
 	CancelUnpaidOrder(ctx context.Context, orderID string) error
-	CancelUnpaidOrders(ctx context.Context) error
-	SentPaymentReminders(ctx context.Context) error
+	// CancelUnpaidOrders(ctx context.Context) error
+	// SentPaymentReminders(ctx context.Context) error
 }
 
 type orderService struct {
@@ -131,7 +131,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderR
 		}
 	}
 
-	status := models.OrderStatusPending
+	status := models.OrderStatusProcessing
 	orderNumber := generateOrderNumber()
 
 	payment := models.Payment{
@@ -361,72 +361,72 @@ func (s *orderService) CancelUnpaidOrder(ctx context.Context, orderID string) er
 	return nil
 }
 
-func (s *orderService) CancelUnpaidOrders(ctx context.Context) error {
-	threshold := time.Now().Add(-1 * 24 * time.Hour)
+// func (s *orderService) CancelUnpaidOrders(ctx context.Context) error {
+// 	threshold := time.Now().Add(-1 * 24 * time.Hour)
 
-	unpaidOrders, err := s.orderRepo.FindUnPaidOrdersBeforeTime(ctx, threshold, models.OrderStatusPending)
-	if err != nil {
-		log.Printf("Error finding unpaid orders: %v", err)
-		return err
-	}
+// 	unpaidOrders, err := s.orderRepo.FindUnPaidOrdersBeforeTime(ctx, threshold, models.OrderStatusPending)
+// 	if err != nil {
+// 		log.Printf("Error finding unpaid orders: %v", err)
+// 		return err
+// 	}
 
-	log.Printf("Found %d unpaid orders to cancel", len(unpaidOrders))
+// 	log.Printf("Found %d unpaid orders to cancel", len(unpaidOrders))
 
-	for _, order := range unpaidOrders {
-		if err := s.CancelUnpaidOrder(ctx, order.ID.Hex()); err != nil {
-			log.Printf("Failed to cancel order %s: %v", order.ID.Hex(), err)
-			continue
-		}
-		log.Printf("Successfully cancelled unpaid order: %s", order.ID.Hex())
-	}
-	return nil 
-}
+// 	for _, order := range unpaidOrders {
+// 		if err := s.CancelUnpaidOrder(ctx, order.ID.Hex()); err != nil {
+// 			log.Printf("Failed to cancel order %s: %v", order.ID.Hex(), err)
+// 			continue
+// 		}
+// 		log.Printf("Successfully cancelled unpaid order: %s", order.ID.Hex())
+// 	}
+// 	return nil 
+// }
 
-func (s *orderService) SentPaymentReminder(ctx context.Context, orderID primitive.ObjectID, hoursLeft int) error {
+// func (s *orderService) SentPaymentReminder(ctx context.Context, orderID primitive.ObjectID, hoursLeft int) error {
 
-	order, err := s.orderRepo.GetOrderDetail(ctx, orderID)
-	if err != nil {
-		return fmt.Errorf("order not found")
-	}
+// 	order, err := s.orderRepo.GetOrderDetail(ctx, orderID)
+// 	if err != nil {
+// 		return fmt.Errorf("order not found")
+// 	}
 
-	if order.Email != "" {
-		if err := s.emailService.SendReminderOrder(order.Email, order, hoursLeft, s.bankAccount); err != nil {
-			fmt.Printf("failed to send cancellation email: %v\n", err)
-		}
-	}
+// 	if order.Email != "" {
+// 		if err := s.emailService.SendReminderOrder(order.Email, order, hoursLeft, s.bankAccount); err != nil {
+// 			fmt.Printf("failed to send cancellation email: %v\n", err)
+// 		}
+// 	}
 
-	return nil
+// 	return nil
 
 
-} 
+// } 
 
-func (s *orderService) SentPaymentReminders(ctx context.Context) error {
+// func (s *orderService) SentPaymentReminders(ctx context.Context) error {
 	
-	reminderTime := time.Now().Add(-20 * time.Hour)
-	endTime := time.Now().Add(-22 * time.Hour)
+// 	reminderTime := time.Now().Add(-20 * time.Hour)
+// 	endTime := time.Now().Add(-22 * time.Hour)
 
-	unpaidOrders, err := s.orderRepo.FindOrdersForReminder(ctx, reminderTime, endTime)
-	if err != nil {
-		log.Printf("Error finding orders for payment reminder: %v", err)
-        return err
-	}
+// 	unpaidOrders, err := s.orderRepo.FindOrdersForReminder(ctx, reminderTime, endTime)
+// 	if err != nil {
+// 		log.Printf("Error finding orders for payment reminder: %v", err)
+//         return err
+// 	}
 
-	log.Printf("Found %d unpaid orders needing payment reminder", len(unpaidOrders))
+// 	log.Printf("Found %d unpaid orders needing payment reminder", len(unpaidOrders))
 
-	for _, order := range unpaidOrders {
-		hoursLeft := int(24 - time.Since(order.CreatedAt).Hours())
+// 	for _, order := range unpaidOrders {
+// 		hoursLeft := int(24 - time.Since(order.CreatedAt).Hours())
 
-		if err := s.SentPaymentReminder(ctx, order.ID, hoursLeft); err != nil {
-			log.Printf("Failed to send reminder for order %s: %v", order.ID.Hex(), err)
-            continue
-		}
+// 		if err := s.SentPaymentReminder(ctx, order.ID, hoursLeft); err != nil {
+// 			log.Printf("Failed to send reminder for order %s: %v", order.ID.Hex(), err)
+//             continue
+// 		}
 
-		if err := s.orderRepo.MarkReminderSent(ctx, order.ID); err != nil {
-			log.Printf("Failed to mark reminder sent for order %s: %v", order.ID.Hex(), err)
-		}
+// 		if err := s.orderRepo.MarkReminderSent(ctx, order.ID); err != nil {
+// 			log.Printf("Failed to mark reminder sent for order %s: %v", order.ID.Hex(), err)
+// 		}
 
-		log.Printf("Successfully sent payment reminder for order: %s", order.ID.Hex())
-	}
+// 		log.Printf("Successfully sent payment reminder for order: %s", order.ID.Hex())
+// 	}
 
-	return nil
-}
+// 	return nil
+// }

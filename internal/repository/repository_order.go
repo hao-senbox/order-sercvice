@@ -22,9 +22,9 @@ type OrderRepository interface {
 	DeleteOrder(ctx context.Context, id primitive.ObjectID) error
 	UpdateOrderPaymentAndStatus(ctx context.Context, id primitive.ObjectID, payment models.Payment, status string) error
 	GetGroupedOrders(ctx context.Context, orders []*models.Order) ([]*models.GroupedOrder, error)
-	FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error)
-	FindOrdersForReminder(ctx context.Context, startTime, endTime time.Time) ([]*models.Order, error)
-	MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error 
+	// FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error)
+	// FindOrdersForReminder(ctx context.Context, startTime, endTime time.Time) ([]*models.Order, error)
+	// MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error 
 }
 
 type orderRepository struct {
@@ -269,71 +269,71 @@ func (r *orderRepository) UpdateOrderPaymentAndStatus(ctx context.Context, id pr
 	return nil
 }
 
-func (r *orderRepository) FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error) {
-	filter := bson.M{
-		"payment.paid":   false,
-		"created_at": bson.M{"$lt": timestamp},
-		"status":         models.OrderStatusPending,
-		"payment.method": models.PaymentMethodBankTransfer,
-	}
+// func (r *orderRepository) FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error) {
+// 	filter := bson.M{
+// 		"payment.paid":   false,
+// 		"created_at": bson.M{"$lt": timestamp},
+// 		"status":         models.OrderStatusPending,
+// 		"payment.method": models.PaymentMethodBankTransfer,
+// 	}
 
-	cursor, err := r.collection.Find(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf("error finding unpaid orders %v", err)
-	}
-	defer cursor.Close(ctx)
+// 	cursor, err := r.collection.Find(ctx, filter)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("error finding unpaid orders %v", err)
+// 	}
+// 	defer cursor.Close(ctx)
 
-	var orders []*models.Order
+// 	var orders []*models.Order
 
-	if err := cursor.All(ctx, &orders); err != nil {
-		return nil, fmt.Errorf("error decoding orders: %w", err)
-	}
+// 	if err := cursor.All(ctx, &orders); err != nil {
+// 		return nil, fmt.Errorf("error decoding orders: %w", err)
+// 	}
 
-	return orders, nil
-}
+// 	return orders, nil
+// }
 
-func (r *orderRepository) FindOrdersForReminder(ctx context.Context, startTime, endTime time.Time) ([]*models.Order, error) {
+// func (r *orderRepository) FindOrdersForReminder(ctx context.Context, startTime, endTime time.Time) ([]*models.Order, error) {
 	
-	filter := bson.M{
-		"payment.paid": false,
-		"status": models.OrderStatusPending,
-		"payment.method": models.PaymentMethodBankTransfer,
-		"reminder_sent": bson.M{"$ne": true},
-		"created_at": bson.M{"$gte": endTime, "$lte": startTime},
-	}
+// 	filter := bson.M{
+// 		"payment.paid": false,
+// 		"status": models.OrderStatusPending,
+// 		"payment.method": models.PaymentMethodBankTransfer,
+// 		"reminder_sent": bson.M{"$ne": true},
+// 		"created_at": bson.M{"$gte": endTime, "$lte": startTime},
+// 	}
 
-	cursor, err := r.collection.Find(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf("error finding orders for reminder: %v", err)
-	}
-	defer cursor.Close(ctx)
+// 	cursor, err := r.collection.Find(ctx, filter)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("error finding orders for reminder: %v", err)
+// 	}
+// 	defer cursor.Close(ctx)
 
-	var orders []*models.Order
-	if err := cursor.All(ctx, &orders); err != nil {
-		return nil, fmt.Errorf("error decoding orders: %w", err)
-	}
+// 	var orders []*models.Order
+// 	if err := cursor.All(ctx, &orders); err != nil {
+// 		return nil, fmt.Errorf("error decoding orders: %w", err)
+// 	}
 
-	return orders, nil
-}
+// 	return orders, nil
+// }
 
-func (r *orderRepository) MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error {
+// func (r *orderRepository) MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error {
 	
-	update := bson.M{
-		"$set": bson.M{
-			"reminder_sent": true,
-			"reminder_sent_at": time.Now(),
-		},
-	}
+// 	update := bson.M{
+// 		"$set": bson.M{
+// 			"reminder_sent": true,
+// 			"reminder_sent_at": time.Now(),
+// 		},
+// 	}
 
-	_, err := r.collection.UpdateOne(
-		ctx,
-		bson.M{"_id": orderID},
-		update,
-	)
-	if err != nil {
-		return fmt.Errorf("error updating reminder status: %w", err)
-	}
+// 	_, err := r.collection.UpdateOne(
+// 		ctx,
+// 		bson.M{"_id": orderID},
+// 		update,
+// 	)
+// 	if err != nil {
+// 		return fmt.Errorf("error updating reminder status: %w", err)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 

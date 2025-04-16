@@ -17,7 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	cronV3 "github.com/robfig/cron/v3" // Sử dụng phiên bản v3
+	// cronV3 "github.com/robfig/cron/v3" // Sử dụng phiên bản v3
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -61,35 +61,33 @@ func main() {
 	// Thiết lập router với Gin
 	router := gin.Default()
 
-	// Khởi tạo cron với cấu hình mới
-	c := cronV3.New(cronV3.WithSeconds(), cronV3.WithLogger(cronV3.DefaultLogger))
+	// c := cronV3.New(cronV3.WithSeconds(), cronV3.WithLogger(cronV3.DefaultLogger))
 	
-	// Thêm job hủy đơn hàng mỗi giờ
-	_, err = c.AddFunc("0 0 * * * *", func() { // Chạy mỗi giờ tại phút thứ 0, giây thứ 0
+	// _, err = c.AddFunc("0 0 * * * *", func() { 
 		
-		log.Println("Bắt đầu chạy job...")
-		ctx := context.Background()
+	// 	log.Println("Bắt đầu chạy job...")
+	// 	ctx := context.Background()
 
-		if err := orderService.CancelUnpaidOrders(ctx); err != nil {
-			log.Printf("Lỗi khi hủy đơn hàng chưa thanh toán: %v", err)
-		} else {
-			log.Println("Job hủy đơn hàng chưa thanh toán hoàn thành")
-		}
+	// 	if err := orderService.CancelUnpaidOrders(ctx); err != nil {
+	// 		log.Printf("Lỗi khi hủy đơn hàng chưa thanh toán: %v", err)
+	// 	} else {
+	// 		log.Println("Job hủy đơn hàng chưa thanh toán hoàn thành")
+	// 	}
 
-		if err := orderService.SentPaymentReminders(ctx); err != nil {
-			log.Printf("Lỗi khi gửi nhắc nhở thanh toán: %v", err)
-		} else {
-			log.Println("Job nhắc nhở thanh toán hoàn thành")
-		}
-	})
+	// 	if err := orderService.SentPaymentReminders(ctx); err != nil {
+	// 		log.Printf("Lỗi khi gửi nhắc nhở thanh toán: %v", err)
+	// 	} else {
+	// 		log.Println("Job nhắc nhở thanh toán hoàn thành")
+	// 	}
+	// })
 
 	
-	if err != nil {
-		log.Printf("Lỗi khi thiết lập cron job: %v", err)
-	} else {
-		c.Start()
-		log.Println("Cron job đã được khởi động")
-	}
+	// if err != nil {
+	// 	log.Printf("Lỗi khi thiết lập cron job: %v", err)
+	// } else {
+	// 	c.Start()
+	// 	log.Println("Cron job đã được khởi động")
+	// }
 	
 	// Đăng ký handlers
 	api.RegisterHandlers(router, orderService)
@@ -114,11 +112,11 @@ func main() {
 	<-quit
 	log.Println("Đang tắt server...")
 
-	// Dừng cron job
-	log.Println("Đang dừng cron job...")
-	cronCtx := c.Stop()
-	<-cronCtx.Done()
-	log.Println("Cron job đã dừng")
+	// // Dừng cron job
+	// log.Println("Đang dừng cron job...")
+	// cronCtx := c.Stop()
+	// <-cronCtx.Done()
+	// log.Println("Cron job đã dừng")
 
 	// Tắt server
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
