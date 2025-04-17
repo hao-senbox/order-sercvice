@@ -24,14 +24,14 @@ func RegisterHandlers(router *gin.Engine, orderService service.OrderService) {
 
 	handlers := NewOrderHandlers(orderService)
 
-	adminOrderGroup := router.Group("/api/admin/orders")
+	adminOrderGroup := router.Group("/api/v1/admin/orders")
 	{
 		adminOrderGroup.GET("", handlers.GetOrders)
 		adminOrderGroup.POST("/:id/verify-payment", handlers.VerifyPayment)
 		adminOrderGroup.POST("/:id/cancel", handlers.CancelUnpaidOrder)
 	}
 
-	orderGroup := router.Group("/api/orders")
+	orderGroup := router.Group("/api/v1/orders")
 	{
 		orderGroup.GET("/:user", handlers.GetOrdersUser)
 		orderGroup.POST("/items", handlers.CreateOrder)
