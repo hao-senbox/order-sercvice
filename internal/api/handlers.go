@@ -1,11 +1,14 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"store/internal/models"
 	"store/internal/service"
+	"store/pkg/constants"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,16 +27,16 @@ func RegisterHandlers(router *gin.Engine, orderService service.OrderService) {
 
 	handlers := NewOrderHandlers(orderService)
 
-	adminOrderGroup := router.Group("/api/v1/admin/orders")
+	adminOrderGroup := router.Group("/api/v1/admin/orders").Use(Secured())
 	{
 		adminOrderGroup.GET("", handlers.GetOrders)
 		adminOrderGroup.POST("/:id/verify-payment", handlers.VerifyPayment)
 		adminOrderGroup.POST("/:id/cancel", handlers.CancelUnpaidOrder)
 	}
 
-	orderGroup := router.Group("/api/v1/orders")
+	orderGroup := router.Group("/api/v1/orders").Use(Secured())
 	{
-		orderGroup.GET("/:user", handlers.GetOrdersUser)
+		orderGroup.GET("", handlers.GetOrdersUser)
 		orderGroup.POST("/items", handlers.CreateOrder)
 		orderGroup.GET("/items/:id", handlers.GetOrderDetail)
 		orderGroup.DELETE("/items/:id", handlers.DeleteOrder)
@@ -64,7 +67,15 @@ func (h *OrderHandlers) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	order, err := h.orderService.CreateOrder(c.Request.Context(), &req)
+	token, ok := c.Get(constants.Token)
+	if !ok {
+		SendError(c, http.StatusForbidden, errors.New("unauthorized"), models.ErrInvalidRequest)
+		return
+	}
+
+	ctx := context.WithValue(c, constants.TokenKey, token)
+
+	order, err := h.orderService.CreateOrder(ctx, &req)
 
 	if err != nil {
 		SendError(c, http.StatusBadRequest, err, models.ErrInvalidOperation)
@@ -114,13 +125,19 @@ func (h *OrderHandlers) GetOrders(c *gin.Context) {
 }
 
 func (h *OrderHandlers) GetOrdersUser(c *gin.Context) {
-	TeacherID := c.Param("user")
-
-	if TeacherID == "" {
-		SendError(c, http.StatusBadRequest, fmt.Errorf("teacher ID cannot be empty"), models.ErrInvalidRequest)
+	
+	teacherID, exists := c.Get(constants.UserID)
+	if !exists {
+		SendError(c, http.StatusBadRequest, fmt.Errorf("user ID cannot be empty"), models.ErrInvalidRequest)
+		return
 	}
 
-	orderUser, err := h.orderService.GetOrdersUser(c.Request.Context(), TeacherID)
+	if teacherID == "" {
+		SendError(c, http.StatusBadRequest, fmt.Errorf("teacher ID cannot be empty"), models.ErrInvalidRequest)
+		return
+	}
+
+	orderUser, err := h.orderService.GetOrdersUser(c.Request.Context(), teacherID.(string))
 
 	if err != nil {
 		SendError(c, http.StatusBadRequest, err, models.ErrInvalidRequest)

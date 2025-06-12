@@ -9,10 +9,12 @@ import (
 	"os"
 	"store/internal/models"
 	"store/internal/repository"
+	"store/pkg/constants"
 	"store/pkg/consul"
 	"store/pkg/email"
 	"sync"
 	"time"
+
 	"github.com/hashicorp/consul/api"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -84,8 +86,9 @@ func (s *orderService) GetOrdersUser(ctx context.Context, TeacherID string) ([]*
 }
 
 func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderRequest) (*models.Order, error) {
-	
-	cartData := s.cartAPI.GetCartByUserID(req.TeacherID)
+
+	cartData := s.cartAPI.GetCartByUserID(ctx)
+
 	if cartData == nil {
 		return nil, fmt.Errorf("failed to get cart data")
 	}
@@ -239,11 +242,18 @@ func NewServiceAPI(client *api.Client, serviceName string) *callAPI {
 	}
 }
 
-func (c *callAPI) GetCartByUserID(UserID string) interface{} {
-	endpoint := fmt.Sprintf("/api/v1/cart/items/%s", UserID)
-	fmt.Printf("Calling cart service with endpoint: %s\n", endpoint)
+func (c *callAPI) GetCartByUserID(ctx context.Context) interface{} {
 
-	res, err := c.client.CallAPI(c.clientServer, endpoint, http.MethodGet, nil, nil)
+	endpoint := fmt.Sprintf("/api/v1/cart/items")
+
+	fmt.Printf("Calling cart service with endpoint: %s\n", endpoint)
+	token := ctx.Value(constants.TokenKey).(string)
+	fmt.Printf("Token: %s\n", token)
+	header := map[string]string{
+		"Authorization": "Bearer " + ctx.Value(constants.TokenKey).(string),
+	}
+
+	res, err := c.client.CallAPI(c.clientServer, endpoint, http.MethodGet, nil, header)
 	if err != nil {
 		fmt.Printf("Error calling cart service: %v\n", err)
 		return nil
