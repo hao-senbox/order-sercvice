@@ -24,7 +24,7 @@ type Order struct {
 	ShippingAddress Address            `bson:"shipping_address" json:"shipping_address"`
 	Payment         Payment            `bson:"payment" json:"payment"`
 	ReminderSent    bool               `bson:"reminder_sent,omitempty"`
-	ReminderSentAt  *time.Time          `bson:"reminder_sent_at,omitempty"`
+	ReminderSentAt  *time.Time         `bson:"reminder_sent_at,omitempty"`
 	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
 }

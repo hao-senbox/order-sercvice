@@ -244,11 +244,8 @@ func NewServiceAPI(client *api.Client, serviceName string) *callAPI {
 
 func (c *callAPI) GetCartByUserID(ctx context.Context) interface{} {
 
-	endpoint := fmt.Sprintf("/api/v1/cart/items")
-
-	fmt.Printf("Calling cart service with endpoint: %s\n", endpoint)
-	token := ctx.Value(constants.TokenKey).(string)
-	fmt.Printf("Token: %s\n", token)
+	endpoint := "/api/v1/cart/items"
+	
 	header := map[string]string{
 		"Authorization": "Bearer " + ctx.Value(constants.TokenKey).(string),
 	}
@@ -271,7 +268,7 @@ func (c *callAPI) GetCartByUserID(ctx context.Context) interface{} {
 		fmt.Printf("Error unmarshaling cart data: %v\n", err)
 		return nil
 	}
-	// Return the actual cart data from inside the wrapper
+
 	return responseWrapper.Data
 }
 
@@ -312,7 +309,6 @@ func (s *orderService) VerifyPayment(ctx context.Context, orderID string) error 
 		return fmt.Errorf("payment has already been verified")
 	}
 
-	// Update payment status
 	now := time.Now()
 	payment := models.Payment{
 		Method:          order.Payment.Method,
@@ -321,15 +317,13 @@ func (s *orderService) VerifyPayment(ctx context.Context, orderID string) error 
 		TransferContent: order.Payment.TransferContent,
 	}
 
-	// Update order status
+
 	statusUpdate := models.OrderStatusProcessing
 
-	// Update both payment and status in the database
 	if err := s.orderRepo.UpdateOrderPaymentAndStatus(ctx, objectID, payment, statusUpdate); err != nil {
 		return fmt.Errorf("failed to update order payment and status: %w", err)
 	}
 
-	// Send confirmation email
 	if order.Email != "" {
 		if err := s.emailService.SendOrderConfirmationUpdate(order.Email, order); err != nil {
 			fmt.Printf("failed to send payment confirmation email: %v\n", err)
@@ -354,14 +348,12 @@ func (s *orderService) CancelUnpaidOrder(ctx context.Context, orderID string) er
 		return fmt.Errorf("order has already been paid")
 	}
 
-	// Update order status to cancelled
 	statusUpdate := models.OrderStatusCanceled
 
 	if err := s.orderRepo.UpdateOrder(ctx, objectID, statusUpdate); err != nil {
 		return fmt.Errorf("failed to update order status: %w", err)
 	}
 
-	// Send cancellation email
 	if order.Email != "" {
 		if err := s.emailService.SendOrderCancellation(order.Email, order); err != nil {
 			fmt.Printf("failed to send cancellation email: %v\n", err)
