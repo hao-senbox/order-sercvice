@@ -24,7 +24,7 @@ type OrderRepository interface {
 	GetGroupedOrders(ctx context.Context, orders []*models.Order) ([]*models.GroupedOrder, error)
 	// FindUnPaidOrdersBeforeTime(ctx context.Context, timestamp time.Time, paymentMethod string) ([]*models.Order, error)
 	// FindOrdersForReminder(ctx context.Context, startTime, endTime time.Time) ([]*models.Order, error)
-	// MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error 
+	// MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error
 }
 
 type orderRepository struct {
@@ -95,13 +95,19 @@ func (r *orderRepository) GetGroupedOrders(ctx context.Context, orders []*models
 		}
 
 		// Calculate totals per student
-		studentTotals := make(map[string]float64)
+		studentTotalsPriceStore := make(map[string]float64)
+		studentTotalsPriceService := make(map[string]float64)
+
 		for studentID, items := range studentItems {
-			total := 0.0
+			totalPriceStore := 0.0
+			totalPriceService := 0.0
 			for _, item := range items {
-				total += item.TotalPrice
+				totalPriceStore += item.TotalPriceStore
+				totalPriceService += item.TotalPriceService
 			}
-			studentTotals[studentID] = math.Round(total*100) / 100
+			studentTotalsPriceStore[studentID] = math.Round(totalPriceStore*100) / 100
+			studentTotalsPriceService[studentID] = math.Round(totalPriceService*100) / 100
+
 		}
 
 		// Create student orders array
@@ -111,36 +117,39 @@ func (r *orderRepository) GetGroupedOrders(ctx context.Context, orders []*models
 			cartItems := make([]models.CartItem, 0, len(orderItems))
 			for _, item := range orderItems {
 				cartItem := models.CartItem{
-					ProductID:   item.ProductID.Hex(), // Convert ObjectID to string
-					ProductName: item.Name,
-					Price:       item.Price,
-					Quantity:    item.Quantity,
+					ProductID:    item.ProductID.Hex(), // Convert ObjectID to string
+					ProductName:  item.Name,
+					PriceStore:   item.PriceStore,
+					PriceService: item.PriceService,
+					Quantity:     item.Quantity,
 					// Note: ImageURL is missing in OrderItems, so it will be empty
 				}
 				cartItems = append(cartItems, cartItem)
 			}
 
 			studentOrder := models.StudentOrder{
-				StudentID:  studentID,
-				Items:      cartItems,
-				TotalPrice: studentTotals[studentID],
+				StudentID:         studentID,
+				Items:             cartItems,
+				TotalPriceStore:   studentTotalsPriceStore[studentID],
+				TotalPriceService: studentTotalsPriceService[studentID],
 			}
 			studentOrders = append(studentOrders, studentOrder)
 		}
 
 		// Create the grouped order
 		groupedOrder := &models.GroupedOrder{
-			ID:              order.ID,
-			TeacherID:       order.TeacherID,
-			OrderNumber:     order.OrderNumber,
-			Email:           order.Email,
-			TotalPrice:      math.Round(order.TotalPrice*100) / 100,
-			Status:          order.Status,
-			StudentOrders:   studentOrders,
-			ShippingAddress: order.ShippingAddress,
-			Payment:         order.Payment,
-			CreatedAt:       order.CreatedAt,
-			UpdatedAt:       order.UpdatedAt,
+			ID:                order.ID,
+			TeacherID:         order.TeacherID,
+			OrderNumber:       order.OrderNumber,
+			Email:             order.Email,
+			TotalPriceStore:   order.TotalPriceStore,
+			TotalPriceService: order.TotalPriceService,
+			Status:            order.Status,
+			StudentOrders:     studentOrders,
+			ShippingAddress:   order.ShippingAddress,
+			Payment:           order.Payment,
+			CreatedAt:         order.CreatedAt,
+			UpdatedAt:         order.UpdatedAt,
 		}
 
 		groupedOrders = append(groupedOrders, groupedOrder)
@@ -293,7 +302,7 @@ func (r *orderRepository) UpdateOrderPaymentAndStatus(ctx context.Context, id pr
 // }
 
 // func (r *orderRepository) FindOrdersForReminder(ctx context.Context, startTime, endTime time.Time) ([]*models.Order, error) {
-	
+
 // 	filter := bson.M{
 // 		"payment.paid": false,
 // 		"status": models.OrderStatusPending,
@@ -317,7 +326,7 @@ func (r *orderRepository) UpdateOrderPaymentAndStatus(ctx context.Context, id pr
 // }
 
 // func (r *orderRepository) MarkReminderSent(ctx context.Context, orderID primitive.ObjectID) error {
-	
+
 // 	update := bson.M{
 // 		"$set": bson.M{
 // 			"reminder_sent": true,
@@ -336,4 +345,3 @@ func (r *orderRepository) UpdateOrderPaymentAndStatus(ctx context.Context, id pr
 
 // 	return nil
 // }
-

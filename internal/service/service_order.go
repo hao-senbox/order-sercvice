@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"store/internal/models"
 	"store/internal/repository"
 	"store/pkg/constants"
@@ -34,6 +32,7 @@ type OrderService interface {
 type orderService struct {
 	orderRepo    repository.OrderRepository
 	cartAPI      *callAPI
+	walletAPI    *callAPI
 	emailService *email.EmailService
 	bankAccount  models.BankAccount
 }
@@ -44,14 +43,16 @@ type callAPI struct {
 }
 
 var (
-	getCartUser = "cart-service"
-	orderMutex sync.Mutex
+	getCartUser   = "cart-service"
+	getWalletUser = "wallet-service"
+	orderMutex    sync.Mutex
 	lastOrderDate string
-	counter uint32
+	counter       uint32
 )
 
 func NewOrderService(orderRepo repository.OrderRepository, client *api.Client) OrderService {
 	cartAPI := NewServiceAPI(client, getCartUser)
+	walletAPI := NewServiceAPI(client, getWalletUser)
 	emailService := email.NewEmailService()
 	bankAccount := models.BankAccount{
 		AccountName:   "VOANHHAO",
@@ -61,6 +62,7 @@ func NewOrderService(orderRepo repository.OrderRepository, client *api.Client) O
 	return &orderService{
 		orderRepo:    orderRepo,
 		cartAPI:      cartAPI,
+		walletAPI:    walletAPI,
 		emailService: emailService,
 		bankAccount:  bankAccount,
 	}
@@ -107,10 +109,9 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderR
 		return nil, fmt.Errorf("cart is empty")
 	}
 
-	fmt.Printf("Cart data retrieved: %v\n", cartData.([]models.StudentCart))
-
 	var orderItems []models.OrderItem
-	var total float64
+	var totalStore float64
+	var totalService float64
 
 	for _, studentCart := range cartData.([]models.StudentCart) {
 		for _, cartItem := range studentCart.Items {
@@ -120,16 +121,21 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderR
 				continue
 			}
 
-			totalPrice := float64(cartItem.Quantity) * cartItem.Price
-			total += totalPrice
+			totalPriceStore := float64(cartItem.Quantity) * cartItem.PriceStore
+			totalPriceService := float64(cartItem.Quantity) * cartItem.PriceService
+
+			totalStore += totalPriceStore
+			totalService += totalPriceService
 
 			orderItems = append(orderItems, models.OrderItem{
-				ProductID:  productID,
-				Quantity:   cartItem.Quantity,
-				Price:      cartItem.Price,
-				Name:       cartItem.ProductName,
-				TotalPrice: totalPrice,
-				StudentID:  studentCart.StudentID,
+				ProductID:         productID,
+				Quantity:          cartItem.Quantity,
+				PriceStore:        cartItem.PriceStore,
+				PriceService:      cartItem.PriceService,
+				Name:              cartItem.ProductName,
+				TotalPriceStore:   totalPriceStore,
+				TotalPriceService: totalPriceService,
+				StudentID:         studentCart.StudentID,
 			})
 		}
 	}
@@ -148,24 +154,38 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderR
 	}
 
 	order := models.Order{
-		TeacherID:   req.TeacherID,
-		OrderNumber: orderNumber,
-		Email:       req.Email,
-		TotalPrice:  total,
-		Status:      status,
-		Items:       orderItems,
+		TeacherID:         req.TeacherID,
+		OrderNumber:       orderNumber,
+		Email:             req.Email,
+		TotalPriceStore:   totalStore,
+		TotalPriceService: totalService,
+		Status:            status,
+		Items:             orderItems,
 		ShippingAddress: models.Address{
-			Street:     req.Street,
-			City:       req.City,
-			State:      req.State,
-			Country:    req.Country,
-			Phone:      req.Phone,
+			Street:  req.Street,
+			City:    req.City,
+			State:   req.State,
+			Country: req.Country,
+			Phone:   req.Phone,
 		},
-		Payment:   payment,
-		ReminderSent: false,
+		Payment:        payment,
+		ReminderSent:   false,
 		ReminderSentAt: nil,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	response, err := s.walletAPI.DeductBalance(ctx, order.TotalPriceStore, order.TotalPriceService)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create order: %w", err)
+	}
+
+	if respMap, ok := response.(map[string]interface{}); ok {
+		if statusCode, exists := respMap["status_code"].(float64); exists && statusCode >= 400 {
+			errorMsg := respMap["error"]
+			errorCode := respMap["error_code"]
+			return nil, fmt.Errorf("API Error: %v, Code: %v, Status: %v", errorMsg, errorCode, statusCode)
+		}
 	}
 
 	savedOrder, err := s.orderRepo.CreateOrder(ctx, order)
@@ -173,40 +193,36 @@ func (s *orderService) CreateOrder(ctx context.Context, req *models.CreateOrderR
 		return nil, fmt.Errorf("unable to create order: %w", err)
 	}
 
-	orders := []*models.Order{savedOrder}
-	groupedOrder, err := s.orderRepo.GetGroupedOrders(ctx, orders)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create order: %w", err)
-	}
+	// orders := []*models.Order{savedOrder}
+	// groupedOrder, err := s.orderRepo.GetGroupedOrders(ctx, orders)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("unable to create order: %w", err)
+	// }
 
 	// Send appropriate emails based on payment method
-	if req.Email != "" {
-		if req.Types == models.PaymentMethodCOD {
-			if err := s.emailService.SendOrderConfirmation(req.Email, groupedOrder[0]); err != nil {
-				fmt.Printf("failed to send confirmation email: %v\n", err)
-			} else {
-				fmt.Printf("order confirmation email sent to: %s\n", req.Email)
-			}
+	// if req.Email != "" {
+	// 	switch req.Types {
+	// 	case models.PaymentMethodCOD:
+	// 		if err := s.emailService.SendOrderConfirmation(req.Email, groupedOrder[0]); err != nil {
+	// 			fmt.Printf("failed to send confirmation email: %v\n", err)
+	// 		} else {
+	// 			fmt.Printf("order confirmation email sent to: %s\n", req.Email)
+	// 		}
 
-			if err := s.emailService.SendEmailNotificationAdmin(os.Getenv("SMTP_USER"), groupedOrder[0]); err != nil {
-				fmt.Printf("failed to send notification email: %v\n", err)
-			} else {
-				log.Printf("order notification email sent to: %s\n", os.Getenv("SMTP_USER"))
-			}
-		} else if req.Types == models.PaymentMethodBankTransfer {
-			if err := s.emailService.SendOrderConfirmationBank(req.Email, groupedOrder[0], s.bankAccount); err != nil {
-				fmt.Printf("Failed to send confirmation email: %v\n", err)
-			} else {
-				fmt.Printf("order confirmation email sent to: %s\n", req.Email)
-			}
+	// 	case models.PaymentMethodBankTransfer:
+	// 		if err := s.emailService.SendOrderConfirmationBank(req.Email, groupedOrder[0], s.bankAccount); err != nil {
+	// 			fmt.Printf("Failed to send confirmation email: %v\n", err)
+	// 		} else {
+	// 			fmt.Printf("order confirmation email sent to: %s\n", req.Email)
+	// 		}
+	// 	}
 
-			if err := s.emailService.SendEmailNotificationAdmin(os.Getenv("SMTP_USER"), groupedOrder[0]); err != nil {
-				fmt.Printf("failed to send notification email: %v\n", err)
-			} else {
-				log.Printf("order notification email sent to: %s\n", os.Getenv("SMTP_USER"))
-			}
-		}
-	}
+	// 	if err := s.emailService.SendEmailNotificationAdmin(os.Getenv("SMTP_USER"), groupedOrder[0]); err != nil {
+	// 		fmt.Printf("failed to send notification email: %v\n", err)
+	// 	} else {
+	// 		log.Printf("order notification email sent to: %s\n", os.Getenv("SMTP_USER"))
+	// 	}
+	// }
 
 	return savedOrder, nil
 }
@@ -245,7 +261,7 @@ func NewServiceAPI(client *api.Client, serviceName string) *callAPI {
 func (c *callAPI) GetCartByUserID(ctx context.Context) interface{} {
 
 	endpoint := "/api/v1/cart/items"
-	
+
 	header := map[string]string{
 		"Authorization": "Bearer " + ctx.Value(constants.TokenKey).(string),
 	}
@@ -272,22 +288,63 @@ func (c *callAPI) GetCartByUserID(ctx context.Context) interface{} {
 	return responseWrapper.Data
 }
 
+func (c *callAPI) DeductBalance(ctx context.Context, priceSotre, priceService float64) (interface{}, error) {
+
+	requestBody := map[string]float64{
+		"price_store":   priceSotre,
+		"price_service": priceService,
+	}
+
+	fmt.Printf("Request body: %v\n", requestBody)
+
+	// Chuyển đổi dữ liệu thành JSON
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling JSON: %v", err)
+	}
+
+	// Thiết lập headers
+	headers := map[string]string{
+		"Content-Type":  "application/json",
+		"Authorization": "Bearer " + ctx.Value(constants.TokenKey).(string),
+	}
+
+	// Gọi API sử dụng phương thức POST
+	endpoint := "/api/v1/wallet/deduct_balance"
+	res, err := c.client.CallAPI(c.clientServer, endpoint, http.MethodPost, jsonData, headers)
+	if err != nil {
+		return nil, fmt.Errorf("error calling API: %v", err)
+	}
+
+	// In ra response để debug
+	fmt.Printf("Raw API response: %s\n", res)
+
+	// Xử lý kết quả trả về
+	var responseData interface{}
+	err = json.Unmarshal([]byte(res), &responseData)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return responseData, nil
+}
+
 func generateOrderNumber() string {
 
-    orderMutex.Lock()
-    defer orderMutex.Unlock()
-    
-    now := time.Now()
-    today := now.Format("060102") 
-    
-    if today != lastOrderDate {
-        lastOrderDate = today
-        counter = 0
-    }
-    
-    counter++
-    
-    return fmt.Sprintf("DH%s%04d", today, counter)
+	orderMutex.Lock()
+	defer orderMutex.Unlock()
+
+	now := time.Now()
+	today := now.Format("060102")
+
+	if today != lastOrderDate {
+		lastOrderDate = today
+		counter = 0
+	}
+
+	counter++
+
+	return fmt.Sprintf("DH%s%04d", today, counter)
 }
 
 func (r *orderService) GetBankAccountInfor() models.BankAccount {
@@ -316,7 +373,6 @@ func (s *orderService) VerifyPayment(ctx context.Context, orderID string) error 
 		PaidAt:          &now,
 		TransferContent: order.Payment.TransferContent,
 	}
-
 
 	statusUpdate := models.OrderStatusProcessing
 
@@ -381,7 +437,7 @@ func (s *orderService) CancelUnpaidOrder(ctx context.Context, orderID string) er
 // 		}
 // 		log.Printf("Successfully cancelled unpaid order: %s", order.ID.Hex())
 // 	}
-// 	return nil 
+// 	return nil
 // }
 
 // func (s *orderService) SentPaymentReminder(ctx context.Context, orderID primitive.ObjectID, hoursLeft int) error {
@@ -399,11 +455,10 @@ func (s *orderService) CancelUnpaidOrder(ctx context.Context, orderID string) er
 
 // 	return nil
 
-
-// } 
+// }
 
 // func (s *orderService) SentPaymentReminders(ctx context.Context) error {
-	
+
 // 	reminderTime := time.Now().Add(-20 * time.Hour)
 // 	endTime := time.Now().Add(-22 * time.Hour)
 

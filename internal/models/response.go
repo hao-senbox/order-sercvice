@@ -21,29 +21,32 @@ type CartResponse struct {
 }
 
 type StudentCart struct {
-	StudentID  string     `json:"_id"`
-	Items      []CartItem `json:"items"`
-	TotalPrice float64    `json:"total_price"`
+	StudentID         string     `json:"_id"`
+	Items             []CartItem `json:"items"`
+	TotalPriceStore   float64    `json:"total_price_store"`
+	TotalPriceService float64    `json:"total_price_service"`
 }
 
 type StudentOrder struct {
-	StudentID  string     `json:"student_id"`
-	Items      []CartItem `json:"items"`
-	TotalPrice float64    `json:"total_price"`
+	StudentID         string     `json:"student_id"`
+	Items             []CartItem `json:"items"`
+	TotalPriceStore   float64    `json:"total_price_store"`
+	TotalPriceService float64    `json:"total_price_service"`
 }
 
 type GroupedOrder struct {
-	ID              primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	TeacherID       string             `bson:"teacher_id" json:"teacher_id"`
-	Email           string             `bson:"email" json:"email"`
-	TotalPrice      float64            `bson:"total_price" json:"total_price"`
-	Status          string             `bson:"status" json:"status"`
-	StudentOrders   []StudentOrder     `bson:"student_orders" json:"student_orders"`
-	ShippingAddress Address            `bson:"shipping_address" json:"shipping_address"`
-	Payment         Payment            `bson:"payment" json:"payment"`
-	OrderNumber     string             `bson:"order_number" json:"order_number"`
-	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
-	UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
+	ID                primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	TeacherID         string             `bson:"teacher_id" json:"teacher_id"`
+	Email             string             `bson:"email" json:"email"`
+	TotalPriceStore   float64            `json:"total_price_store"`
+	TotalPriceService float64            `json:"total_price_service"`
+	Status            string             `bson:"status" json:"status"`
+	StudentOrders     []StudentOrder     `bson:"student_orders" json:"student_orders"`
+	ShippingAddress   Address            `bson:"shipping_address" json:"shipping_address"`
+	Payment           Payment            `bson:"payment" json:"payment"`
+	OrderNumber       string             `bson:"order_number" json:"order_number"`
+	CreatedAt         time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt         time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
 type PaginatedResponse struct {

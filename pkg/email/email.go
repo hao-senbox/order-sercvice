@@ -142,7 +142,7 @@ func (es *EmailService) SendOrderConfirmation(email string, order *models.Groupe
 					</tr>` + generateOrderItemsTable(order) + `
 				</table>
 				<div class="total">
-					Total: $` + fmt.Sprintf("%.2f", order.TotalPrice) + `
+					Total: $` + fmt.Sprintf("%.2f", order.TotalPriceStore) + `
 				</div>
 				<div class="note-cod">
 					<h3 style="margin-top: 0; color: #856404;">Cash on Delivery (COD) Information</h3>
@@ -279,14 +279,14 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 	var subtotal float64
 	for _, studentOrder := range order.StudentOrders {
 		for _, item := range studentOrder.Items {
-			itemTotal := float64(item.Quantity) * item.Price
+			itemTotal := float64(item.Quantity) * item.PriceStore
 			subtotal += itemTotal
 			body += fmt.Sprintf(`
 					<tr>
 						<td>%s</td>
 						<td>%d</td>
 						<td>$%.2f</td>
-					</tr>`, item.ProductName, item.Quantity, item.Price)
+					</tr>`, item.ProductName, item.Quantity, item.PriceStore)
 		}
 	}
 	state := ""
@@ -315,7 +315,7 @@ func (es *EmailService) SendOrderConfirmationUpdate(email string, order *models.
 			</div>
 		</body>
 		</html>`,
-		order.TotalPrice,
+		order.TotalPriceStore,
 		order.ShippingAddress.Street,
 		order.ShippingAddress.City,
 		state,
@@ -439,7 +439,7 @@ func (es *EmailService) SendOrderConfirmationBank(email string, order *models.Gr
 								<p><strong>Bank Name:</strong> ` + bank.BankName + `</p>
 								<p><strong>Account Holder:</strong> ` + bank.AccountName + `</p>
 								<p><strong>Account Number:</strong> ` + bank.AccountNumber + `</p>
-								<p><strong>Total Price:</strong> $` + fmt.Sprintf("%.2f", order.TotalPrice) + `</p>
+								<p><strong>Total Price:</strong> $` + fmt.Sprintf("%.2f", order.TotalPriceStore) + `</p>
 								<p><strong>Transfer Note:</strong> <span style="color: #c0392b;">` + *order.Payment.TransferContent + `</span></p>
 								<p style="margin-top: 10px;">⚠️ Please make sure to include the correct transfer note to help us verify your payment quickly.</p>
 							</div>
@@ -453,7 +453,7 @@ func (es *EmailService) SendOrderConfirmationBank(email string, order *models.Gr
 						</tr>` + generateOrderItemsTable(order) + `
 					</table>
 					<div class="total">
-						Total: $` + fmt.Sprintf("%.2f", order.TotalPrice) + `
+						Total: $` + fmt.Sprintf("%.2f", order.TotalPriceStore) + `
 					</div>
 					<div class="shipping-info">
 						<h3>Delivery Information</h3>
@@ -483,7 +483,7 @@ func generateOrderItemsTable(order *models.GroupedOrder) string {
 						<td>%s</td>
 						<td>%d</td>
 						<td>$%.2f</td>
-					</tr>`, item.ProductName, item.Quantity, item.Price)
+					</tr>`, item.ProductName, item.Quantity, item.PriceStore)
 		}
 	}
 	return tableRows
@@ -511,6 +511,12 @@ func (es *EmailService) SendEmailNotificationAdmin(email string, order *models.G
 	m.SetHeader("From", os.Getenv("SMTP_USER"))
 	m.SetHeader("To", email)
 	m.SetHeader("Subject", "New Order Notification")
+
+	// Dòng HTML có phần `Transfer Note` tách riêng và dựng sau nếu có
+	transferNoteHTML := ""
+	if order.Payment.TransferContent != nil {
+		transferNoteHTML = `<p><strong>Transfer Note:</strong> ` + *order.Payment.TransferContent + `</p>`
+	}
 
 	body := `
 		<html>
@@ -624,13 +630,13 @@ func (es *EmailService) SendEmailNotificationAdmin(email string, order *models.G
 					</tr>` + generateOrderItemsTable(order) + `
 				</table>
 				<div class="total">
-					Total: $` + fmt.Sprintf("%.2f", order.TotalPrice) + `
+					Total: $` + fmt.Sprintf("%.2f", order.TotalPriceStore) + `
 				</div>
 				<div class="payment-info">
 					<h3 style="margin-top: 0; color: #0d47a1;">Payment Information</h3>
 					<p><strong>Payment Method:</strong> ` + order.Payment.Method + `</p>
 					<p><strong>Payment Status:</strong> ` + order.Status + `</p>
-					<p><strong>Transfer Note:</strong> ` + *order.Payment.TransferContent + `</p>
+					` + transferNoteHTML + `
 				</div>
 				<div class="shipping-info">
 					<h3>Delivery Information</h3>
@@ -756,14 +762,14 @@ func (es *EmailService) SendOrderCancellation(email string, order *models.Groupe
 	var subtotal float64
 	for _, studentOrder := range order.StudentOrders {
 		for _, item := range studentOrder.Items {
-			itemTotal := float64(item.Quantity) * item.Price
+			itemTotal := float64(item.Quantity) * item.PriceService
 			subtotal += itemTotal
 			body += fmt.Sprintf(`
 					<tr>
 						<td>%s</td>
 						<td>%d</td>
 						<td>$%.2f</td>
-					</tr>`, item.ProductName, item.Quantity, item.Price)
+					</tr>`, item.ProductName, item.Quantity, item.PriceStore)
 		}
 	}
 
@@ -779,7 +785,7 @@ func (es *EmailService) SendOrderCancellation(email string, order *models.Groupe
 				</div>
 			</div>
 		</body>
-		</html>`, order.TotalPrice)
+		</html>`, order.TotalPriceStore)
 
 	m.SetBody("text/html", body)
 
@@ -902,7 +908,7 @@ func (es *EmailService) SendReminderOrder(email string, order *models.GroupedOrd
 							<p><strong>Bank Name:</strong> ` + bank.BankName + `</p>
 							<p><strong>Account Holder:</strong> ` + bank.AccountName + `</p>
 							<p><strong>Account Number:</strong> ` + bank.AccountNumber + `</p>
-							<p><strong>Total Price:</strong> $` + fmt.Sprintf("%.2f", order.TotalPrice) + `</p>
+							<p><strong>Total Price:</strong> $` + fmt.Sprintf("%.2f", order.TotalPriceStore) + `</p>
 							<p><strong>Transfer Note:</strong> <span style="color: #c0392b;">` + *order.Payment.TransferContent + `</span></p>
 							<p style="margin-top: 10px;">⚠️ Please make sure to include the correct transfer note to help us verify your payment quickly.</p>
 						</div>
@@ -918,14 +924,14 @@ func (es *EmailService) SendReminderOrder(email string, order *models.GroupedOrd
 	var subtotal float64
 	for _, studentOrder := range order.StudentOrders {
 		for _, item := range studentOrder.Items {
-			itemTotal := float64(item.Quantity) * item.Price
+			itemTotal := float64(item.Quantity) * item.PriceStore
 			subtotal += itemTotal
 			body += fmt.Sprintf(`
 					<tr>
 						<td>%s</td>
 						<td>%d</td>
 						<td>$%.2f</td>
-					</tr>`, item.ProductName, item.Quantity, item.Price)
+					</tr>`, item.ProductName, item.Quantity, item.PriceStore)
 		}
 	}
 
@@ -938,7 +944,7 @@ func (es *EmailService) SendReminderOrder(email string, order *models.GroupedOrd
 				<p>If you have any questions, please contact our customer support.</p>
 			</div>
 		</body>
-		</html>`, order.TotalPrice)
+		</html>`, order.TotalPriceStore)
 
 	m.SetBody("text/html", body)
 

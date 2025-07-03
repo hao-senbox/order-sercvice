@@ -14,28 +14,31 @@ const (
 )
 
 type Order struct {
-	ID              primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	OrderNumber     string             `bson:"order_number" json:"order_number"`
-	TeacherID       string             `bson:"teacher_id" json:"teacher_id"`
-	Email           string             `bson:"email" json:"email"`
-	TotalPrice      float64            `bson:"total_price" json:"total_price"`
-	Status          string             `bson:"status" json:"status"`
-	Items           []OrderItem        `bson:"items" json:"items"`
-	ShippingAddress Address            `bson:"shipping_address" json:"shipping_address"`
-	Payment         Payment            `bson:"payment" json:"payment"`
-	ReminderSent    bool               `bson:"reminder_sent,omitempty"`
-	ReminderSentAt  *time.Time         `bson:"reminder_sent_at,omitempty"`
-	CreatedAt       time.Time          `bson:"created_at" json:"created_at"`
-	UpdatedAt       time.Time          `bson:"updated_at" json:"updated_at"`
+	ID                primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	OrderNumber       string             `bson:"order_number" json:"order_number"`
+	TeacherID         string             `bson:"teacher_id" json:"teacher_id"`
+	Email             string             `bson:"email" json:"email"`
+	TotalPriceStore   float64            `bson:"total_price_store" json:"total_price_store"`
+	TotalPriceService float64            `bson:"total_price_service" json:"total_price_service"`
+	Status            string             `bson:"status" json:"status"`
+	Items             []OrderItem        `bson:"items" json:"items"`
+	ShippingAddress   Address            `bson:"shipping_address" json:"shipping_address"`
+	Payment           Payment            `bson:"payment" json:"payment"`
+	ReminderSent      bool               `bson:"reminder_sent,omitempty"`
+	ReminderSentAt    *time.Time         `bson:"reminder_sent_at,omitempty"`
+	CreatedAt         time.Time          `bson:"created_at" json:"created_at"`
+	UpdatedAt         time.Time          `bson:"updated_at" json:"updated_at"`
 }
 
 type OrderItem struct {
-	ProductID  primitive.ObjectID `bson:"product_id" json:"product_id"`
-	Quantity   int                `bson:"quantity" json:"quantity"`
-	Price      float64            `bson:"price" json:"price"`
-	Name       string             `bson:"name" json:"name"`
-	TotalPrice float64            `bson:"total_price" json:"total_price"`
-	StudentID  string             `bson:"student_id" json:"student_id"`
+	ProductID         primitive.ObjectID `bson:"product_id" json:"product_id"`
+	Quantity          int                `bson:"quantity" json:"quantity"`
+	PriceStore        float64            `bson:"price_store" json:"price_store"`
+	PriceService      float64            `bson:"price_service" json:"price_service"`
+	Name              string             `bson:"name" json:"name"`
+	TotalPriceStore   float64            `bson:"total_price_store" json:"total_price_store"`
+	TotalPriceService float64            `bson:"total_price_service" json:"total_price_service"`
+	StudentID         string             `bson:"student_id" json:"student_id"`
 }
 
 type Address struct {
@@ -54,11 +57,12 @@ type Payment struct {
 }
 
 type CartItem struct {
-	ImageURL    string  `json:"image_url"`
-	Price       float64 `json:"price"`
-	ProductID   string  `json:"product_id"`
-	ProductName string  `json:"product_name"`
-	Quantity    int     `json:"quantity"`
+	ImageURL     string  `json:"image_url"`
+	PriceStore   float64 `json:"price_store"`
+	PriceService float64 `json:"price_service"`
+	ProductID    string  `json:"product_id"`
+	ProductName  string  `json:"product_name"`
+	Quantity     int     `json:"quantity"`
 }
 
 type BankAccount struct {
